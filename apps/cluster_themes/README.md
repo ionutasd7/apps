@@ -147,7 +147,7 @@ Old and new together, for a plug-in hybrid. Chrome-ringed speedo and tach with d
 
 Clock, range and outside temperature run along the bottom as in the other themes.
 
-What the numbers are: fuel per 100 km comes from the tank's litres since the start of the drive, so it shows only after 5 km and once a litre is used (a fill-up starts it again). The electric range is an estimate: battery charge x **Electric range on a full battery** (Settings, 45 km by default), not BMW's own figure. The status pill only knows what the app reads; BMW's own check-control messages are not on any signal the app has, so ALL SYSTEMS OK means these readings are fine, not that the car has no fault.
+What the numbers are: fuel per 100 km comes from the tank's litres since the start of the drive, so it shows only after 5 km and once a litre is used (a fill-up starts it again). The electric range is an estimate: battery charge x 45 km (the setting `evRangeFull`, not on the center-screen page yet), not BMW's own figure. The status pill only knows what the app reads; BMW's own check-control messages are not on any signal the app has, so ALL SYSTEMS OK means these readings are fine, not that the car has no fault.
 
 <p align="center"><img src="../../docs/images/cluster-heritage.png" width="900" alt="Heritage theme"></p>
 <p align="center"><img src="../../docs/images/cluster-heritage-ok.png" width="900" alt="Heritage theme, all systems OK"></p>
