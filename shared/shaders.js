@@ -1757,4 +1757,124 @@ void main() {
 }
 `;
 
-module.exports = { shiftbar: SHIFTBAR, arc: ARC, revbar: REVBAR, lights: LIGHTS, fill: FILL, box: BOX, grid: GRID, segbar: SEGBAR, mdash: MDASH, mtach: MTACH, sdash: SDASH, boxes: BOXES, atext: ATEXT, meter: METER, gmeter: GMETER, revarc: REVARC, tiles: TILES, ribbon: RIBBON, deco: DECO, mview: MVIEW, vdash: VDASH };
+
+const PDASH = `// pdash: up to two premium round gauges in ONE cluster-render "effect" layer (GLSL ES 1.00), the M Performance,
+// M Competition and i Electric themes' (tools/gen_dials.py). Over the background u_bg each dial draws: a soft tinted
+// well inside it, a lit band filled from the start to u_val.x along a three-stop gradient (u_ca at 0, u_cb at 0.55,
+// u_cc at 1 of the sweep) with a glow round the lit part, the unlit band u_trackC, a bright tip line at the value,
+// tick marks inside the band (every u_ang.w-th one long), a thin red arc past u_val.y outside the band, and a chrome
+// bezel. Optional slanted three-colour stripe (the M stripe) in u_stripe. Array uniforms (vec4, 2 elements):
+//   u_dial[i]  cx, cy (layer px, y down), outer r, band width
+//   u_ang[i]   start, sweep (radians clockwise from 12 o'clock), ticks, long tick every n
+//   u_val[i]   value 0..1, red zone from 0..1 (over 1: none), glow 0..1, bezel 0 / 1
+//   u_ca[i] u_cb[i] u_cc[i]  gradient stops (rgb, a unused)
+// u_n dials in use; u_flash 1: the lit bands flash white (the shift point). v_uv (0,0) is the top-left.
+precision mediump float;
+varying vec2 v_uv;
+uniform vec2 u_size;
+uniform vec4 u_bg;
+uniform float u_n;
+uniform vec4 u_dial[2];
+uniform vec4 u_ang[2];
+uniform vec4 u_val[2];
+uniform vec4 u_ca[2];
+uniform vec4 u_cb[2];
+uniform vec4 u_cc[2];
+uniform vec4 u_trackC;
+uniform vec4 u_tickC;
+uniform vec3 u_redC;
+uniform vec3 u_bezelC;
+uniform float u_flash;
+uniform vec4 u_stripe;
+uniform vec3 u_s1;
+uniform vec3 u_s2;
+uniform vec3 u_s3;
+
+const float PI = 3.14159265359;
+
+vec3 grad(vec3 a, vec3 b, vec3 c, float f) {
+    return f < 0.55 ? mix(a, b, smoothstep(0.0, 0.55, f)) : mix(b, c, smoothstep(0.55, 1.0, f));
+}
+
+void main() {
+    vec2 p = v_uv * u_size;
+    vec3 col = u_bg.rgb;
+    for (int i = 0; i < 2; i++) {
+        if (float(i) >= u_n) break;
+        vec4 D = u_dial[i];
+        vec4 A = u_ang[i];
+        vec4 V = u_val[i];
+        vec2 d = p - D.xy;
+        float rr = length(d);
+        if (rr > D.z + 60.0) continue;
+        float inner = D.z - D.w;
+        float a = atan(d.x, -d.y);
+        float rel = mod(a - A.x + 4.0 * PI, 2.0 * PI);
+        float f = rel / A.y;
+        bool inSweep = rel <= A.y;
+        vec3 ca = u_ca[i].rgb, cb = u_cb[i].rgb, cc = u_cc[i].rgb;
+        // the well: a faint tint of the dial's first colour, darkest at the centre
+        float well = smoothstep(inner - 4.0, inner * 0.35, rr) * clamp((inner - rr) / 6.0, 0.0, 1.0);
+        col += ca * 0.07 * well;
+        // a ring of light under the band's inner edge
+        col += ca * 0.10 * exp(-abs(rr - inner + 2.0) / 3.0) * (inSweep ? 1.0 : 0.0);
+        if (inSweep) {
+            float val = clamp(V.x, 0.0, 1.0);
+            float bandM = clamp(rr - inner + 0.5, 0.0, 1.0) * clamp(D.z - rr + 0.5, 0.0, 1.0);
+            float litEdge = clamp((val * A.y - rel) * rr + 0.5, 0.0, 1.0);
+            vec3 g = grad(ca, cb, cc, f);
+            if (u_flash > 0.5) g = vec3(1.0);
+            // lit band: brighter towards its outer edge
+            float shade = 0.72 + 0.28 * smoothstep(inner, D.z, rr);
+            vec3 lit = g * shade;
+            col = mix(col, u_trackC.rgb, u_trackC.a * bandM * (1.0 - litEdge));
+            col = mix(col, lit, bandM * litEdge);
+            // glow round the lit part
+            float dist = max(inner - rr, rr - D.z);
+            if (dist > 0.0) col += g * V.z * 0.55 * exp(-dist / 14.0) * litEdge;
+            // the tip
+            float tipD = abs(rel - val * A.y) * rr;
+            float tip = clamp(2.2 - tipD, 0.0, 1.0) * step(inner - 14.0, rr) * step(rr, D.z + 8.0) * step(0.004, val);
+            col = mix(col, vec3(1.0), tip);
+            col += g * 0.35 * exp(-tipD / 6.0) * step(inner - 14.0, rr) * step(rr, D.z + 8.0) * step(0.004, val);
+            // ticks inside the band
+            float ft = f * A.z;
+            float k = floor(ft + 0.5);
+            float along = abs(ft - k) / A.z * A.y * rr;
+            bool major = mod(k, A.w) < 0.5;
+            float tIn = major ? inner - 30.0 : inner - 18.0;
+            float tW = major ? 1.6 : 0.9;
+            float tick = clamp(tW + 0.5 - along, 0.0, 1.0) * clamp(rr - tIn + 0.5, 0.0, 1.0) * clamp(inner - 8.0 - rr + 0.5, 0.0, 1.0);
+            vec3 tc = (k / A.z >= V.y) ? u_redC : u_tickC.rgb;
+            col = mix(col, tc, tick * u_tickC.a);
+            // the red zone outside the band
+            float red = step(V.y, f) * clamp(rr - D.z - 5.0 + 0.5, 0.0, 1.0) * clamp(D.z + 10.0 - rr + 0.5, 0.0, 1.0);
+            col = mix(col, u_redC, red);
+        }
+        // chrome bezel round the sweep, its shine moving with the angle
+        if (V.w > 0.5 && (rel <= A.y + 0.08 || rel >= 2.0 * PI - 0.08)) {
+            float bz = clamp(1.6 - abs(rr - D.z - 22.0), 0.0, 1.0);
+            float shine = 0.35 + 0.65 * pow(abs(sin(a * 1.3 + 0.6)), 3.0);
+            col = mix(col, u_bezelC * shine, bz);
+        }
+    }
+    // the stripe: three slanted bars
+    if (u_stripe.z > 0.0) {
+        vec2 q = p - u_stripe.xy;
+        if (q.y >= 0.0 && q.y <= u_stripe.w) {
+            float xs = q.x - (u_stripe.w - q.y) * 0.6;
+            float bw = u_stripe.z / 3.0;
+            if (xs >= 0.0 && xs < u_stripe.z) {
+                float j = floor(xs / bw);
+                float e = min(xs - j * bw, bw - (xs - j * bw));
+                float m = clamp(e - 2.0, 0.0, 1.0);
+                vec3 sc = j < 0.5 ? u_s1 : (j < 1.5 ? u_s2 : u_s3);
+                col = mix(col, sc, m);
+            }
+        }
+    }
+    gl_FragColor = vec4(col, u_bg.a);
+}
+`;
+
+module.exports = { shiftbar: SHIFTBAR, arc: ARC, revbar: REVBAR, lights: LIGHTS, fill: FILL, box: BOX, grid: GRID, segbar: SEGBAR, mdash: MDASH, mtach: MTACH, sdash: SDASH, boxes: BOXES, atext: ATEXT, meter: METER, gmeter: GMETER, revarc: REVARC, tiles: TILES, ribbon: RIBBON, deco: DECO, mview: MVIEW, vdash: VDASH, pdash: PDASH };

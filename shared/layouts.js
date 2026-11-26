@@ -43,6 +43,7 @@ const TYPES = {
     tiles: ['tiles'],
     revarc: ['center', 'r', 'start', 'sweep'],
     ribbon: ['curve', 'span'],
+    pdash: ['dials'],
     deco: [],
     nav: [],
 };

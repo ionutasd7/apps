@@ -160,6 +160,42 @@ const THEMES = {
         ink: [12, 12, 14, 255], accent: [0, 150, 224, 255], well: [0, 0, 0, 255],
         bar1: [0, 150, 224, 255], bar2: [40, 92, 200, 255], warn: [226, 39, 46, 255],
     },
+    // M Performance (layout mperf.json, tools/gen_dials.py): twin chrome-ringed dials in M colours, the bands filling light
+    // blue -> M blue -> M red, the slanted M stripe over a big gear. Extra roles: mlb, mdb, mred (the M stripe's colours).
+    mperf: {
+        name: 'M Performance',
+        fg: [242, 245, 250, 255], dim: [150, 160, 176, 255], track: [26, 30, 40, 255], arc: [79, 180, 255, 255],
+        glow: 0, stripe: true,
+        bar: { low: [79, 180, 255], mid: [47, 91, 216], high: [255, 42, 42], midAt: 0.5 },
+        rev: { from: [79, 180, 255], to: [47, 91, 216] },
+        bg: [0, 0, 0, 255], panel: [0, 0, 0, 255], line: [176, 184, 198, 255], head: [79, 180, 255, 255],
+        ink: [12, 12, 14, 255], accent: [79, 180, 255, 255], well: [0, 0, 0, 255],
+        mlb: [79, 180, 255, 255], mdb: [47, 91, 216, 255], mred: [232, 38, 45, 255],
+    },
+    // M Competition (layout mcomp.json, tools/gen_dials.py): one big rev dial in the middle, white heating to amber and red,
+    // a huge gear inside it, race data down both sides. Extra roles: amber, mred.
+    mcomp: {
+        name: 'M Competition',
+        fg: [244, 244, 246, 255], dim: [146, 150, 158, 255], track: [30, 30, 34, 255], arc: [244, 244, 246, 255],
+        glow: 0, stripe: true,
+        bar: { low: [244, 244, 246], mid: [255, 170, 40], high: [255, 42, 42], midAt: 'shift' },
+        rev: { from: [244, 244, 246], to: [255, 170, 40] },
+        bg: [0, 0, 0, 255], panel: [0, 0, 0, 255], line: [150, 154, 162, 255], head: [232, 38, 45, 255],
+        ink: [12, 12, 14, 255], accent: [232, 38, 45, 255], well: [0, 0, 0, 255],
+        amber: [255, 170, 40, 255], mred: [232, 38, 45, 255], white: [244, 244, 246, 255],
+    },
+    // i Electric (layout ielec.json, tools/gen_dials.py): BMW i blue and electric cyan, glowing twin dials (speed, and the
+    // high-voltage battery of a plug-in hybrid), calm and bright. Extra roles: deep, iblue, cyan, teal.
+    ielec: {
+        name: 'i Electric',
+        fg: [236, 246, 255, 255], dim: [120, 146, 178, 255], track: [18, 30, 48, 255], arc: [40, 140, 255, 255],
+        glow: 0, stripe: false,
+        bar: { low: [40, 140, 255], mid: [40, 140, 255], high: [255, 42, 42], midAt: 'shift' },
+        rev: { from: [40, 140, 255], to: [120, 230, 255] },
+        bg: [0, 0, 0, 255], panel: [0, 0, 0, 255], line: [70, 110, 160, 255], head: [40, 140, 255, 255],
+        ink: [12, 12, 14, 255], accent: [40, 140, 255, 255], well: [0, 0, 0, 255],
+        deep: [16, 64, 190, 255], iblue: [40, 140, 255, 255], cyan: [130, 232, 255, 255], teal: [0, 196, 170, 255],
+    },
     // Ribbon (layout ribbon.json, Nov 13 2026): calm and premium. One ribbon of light under the hood line fills with the
     // revs (cool white, warming to amber, red at the top), a huge thin speed, thin side columns. Extra roles: gear (the
     // gear number), ribbon (the line's gradient), greeting (the {{holiday}} text). holidays: true = the holiday

@@ -127,6 +127,10 @@
  *             drawing, a layout's "flipX" / "flipY" swap again. g is averaged over 150 ms and a sample over 3 g is
  *             dropped (also for the tokens). The envelope and the bests (tokens, the page's G-meter tab) last until
  *             resetG(), the app's restart or the switch between demo and car data.
+ *   pdash     effect layer (shaders.js pdash): up to two premium dials, "dials": [{ cx, cy, r, band, start, sweep (deg,
+ *             clockwise from 12), ticks, major, signal (speed: BMW's uneven SPEED_SCALE; rpm: to max, red from the redline
+ *             setting), min, max, red, glow 0..1, bezel, colors [3 roles: gradient at 0, 0.55, 1] }], optional "stripe" [x, y,
+ *             w, h] (the slanted M stripe); roles color (bg), trackColor, tickColor, bezelColor. Layouts: tools/gen_dials.py
  *   revarc    effect layer (shaders.js revarc): a segmented rev arc, the Rally theme's: centre "center" [x, y] (layer px, may
  *             sit below the layer), outer radius "r", "band" px (40), "start" / "sweep" degrees clockwise from 12 o'clock,
  *             "segments" (30); colours, flash and scale as the shiftbar.
@@ -232,6 +236,7 @@
  * (gauge labels for 1.4 / 0.7 bar in the display unit) {{stage}} (P R N, D / S / M by the shifter programme) {{gearInD}} (gear number while in D) {{mode}} (COMFORT, SPORT, SPORT PLUS, SPORT INDIVIDUAL, ECO PRO, ...)
  * {{temp:<deg C>}} (that temperature in the display unit, °F rounded to 10, for gauge labels) {{setup:engine|chassis|steering|gearbox}} (what that part is set to in the drive mode now)
  * {{time}} {{ampm}} {{u:temp}} (°F / °C) {{gLat}} {{gLong}} (g, 2 decimals) {{gSide}} ("0.42 L", "0.42 R")
+ * {{engineState}} (ENGINE ON / ENGINE OFF, a plug-in hybrid's combustion engine by rpm) {{hvSoc}} (a plug-in hybrid's battery %)
  * {{gFwd}} ("0.31 ACC", "0.31 BRK") {{gBest}} (the most g this drive) {{gMax}} (the G-meter's range, "1.2") {{signal:<car.data() key>}} (raw, 1 decimal).
  * Redline (shift_score.js): {{rpm10}} (rpm to 10) {{shiftAt}} {{lastShift}} {{lastGears}} (4 > 5)
  * {{verdict}} {{shiftPrompt}} (SHIFT at the shift point) {{coldNote}} (only while the oil is cold).
@@ -359,7 +364,7 @@ function mediaText(v) {
 /** Seconds as m:ss. */
 function clockOf(sec) { const t = Math.max(0, Math.floor(sec)); return Math.floor(t / 60) + ':' + ('0' + (t % 60)).slice(-2); }   // its speed scale: 0..200 mph by 20, 0..330 km/h by 30 (linear)
 const ROAD_DASH_M = 12;            // the Sport road: metres per dash and gap (shaders.js sdash u_road)
-const CUE_TYPES = { lights: true, shiftbar: true, revbar: true, revarc: true, ribbon: true, mtach: true };
+const CUE_TYPES = { lights: true, shiftbar: true, revbar: true, revarc: true, ribbon: true, mtach: true, pdash: true };
 // the shift-light test (page.js Alerts): rpm climbs from TEST_FROM to just past the shift point, then holds
 const TEST_FROM = 1500, TEST_CLIMB_MS = 2500, TEST_HOLD_MS = 1200;
 // night colours (Cluster Themes "nightDim"): after sunset the theme's whites and greys go to this brightness
@@ -1542,6 +1547,20 @@ class HudApp {
         return isNum(lim) && lim > 0 && isNum(v) && v > lim ? id : null;
     }
 
+    /** pdash: a dial's value 0..1. speed runs along SPEED_SCALE (BMW's own uneven speedo), rpm to "max" (7000). */
+    _pdashFrac(d) {
+        const v = this._raw(d.signal);
+        if (!isNum(v)) return 0;
+        if (d.signal === 'speed') { const us = this.setting('units') === 'us'; return scaleFrac(us ? v * 0.621371 : v, SPEED_SCALE[us ? 'us' : 'metric']); }
+        const mn = isNum(d.min) ? d.min : 0, mx = isNum(d.max) ? d.max : 100;
+        return Math.min(1, Math.max(0, (v - mn) / (mx - mn)));
+    }
+    /** pdash: where a dial's red zone starts, 0..1 (2: none). rpm: the redline setting; else the dial's "red" value. */
+    _pdashRed(d) {
+        if (d.signal === 'rpm') return Math.min(2, this.setting('redline') / (d.max || 7000));
+        if (isNum(d.red)) { const mn = isNum(d.min) ? d.min : 0, mx = isNum(d.max) ? d.max : 100; return (d.red - mn) / (mx - mn); }
+        return 2;
+    }
     _barMax(w) { return Math.ceil(this.setting('redline') / 1000) * 1000 + ((w && w.over) || 0); }
 
     /** The shift point now ({ rpm, cold }) and whether the rpm is at or past it. */
@@ -1728,7 +1747,7 @@ class HudApp {
                 const v = name === 'powerPct' ? this.sportPower : this.sportTorque;
                 if (isNum(v)) return v;
             }
-            const e = this.config.engine || {}, d = this.car.data();
+            const e = this.layoutEngine || this.config.engine || {}, d = this.car.data();
             if (!isNum(d.torque)) return null;
             if (name === 'torquePct') return Math.max(0, d.torque) / (e.torqueNm || 500) * 100;
             return isNum(d.rpm) ? Math.max(0, d.torque) * d.rpm / 9549 / (e.powerKw || 285) * 100 : null;
@@ -1827,6 +1846,8 @@ class HudApp {
                 return String(Math.round(us ? kw * 1.341 : kw));
             }
             case 'hvSoc': { const v = this._raw('hvSoc'); return isNum(v) ? String(Math.round(v)) : '--'; }
+            // a plug-in hybrid's combustion engine running or not (ENGINE ON / ENGINE OFF): rpm under 300 counts as off
+            case 'engineState': { const v = this._raw('rpm'); return isNum(v) ? (v < 300 ? 'ENGINE OFF' : 'ENGINE ON') : '--'; }
             case 'fuelPct': { const v = this._raw('fuel'); return isNum(v) ? String(Math.round(v * 100)) : '--'; }
             case 'ambientN': { const v = this._raw('ambient'); return isNum(v) ? String(Math.round(usT ? v * 9 / 5 + 32 : v)) : '--'; }
             case 'torque': { const v = this._raw('torque'); return fix(isNum(v) ? (us ? v * 0.737562 : v) : v, 0); }
@@ -1971,7 +1992,7 @@ class HudApp {
         this.mapShown = this.setting('mapUp');
         if (name === 'off') {
             this._wazeWant();
-            this.problem = null; this.layoutTheme = null; this.needsBoost = false; this.needsIntake = false; this.needsHv = false; this.needsFuel = false;
+            this.problem = null; this.layoutTheme = null; this.layoutEngine = null; this.needsBoost = false; this.needsIntake = false; this.needsHv = false; this.needsFuel = false;
             this.log.info('off: nothing drawn, BMW\'s own ' + (this.target === 'panel' ? 'cluster' : 'HUD') + ' shows');
             return;
         }
@@ -1990,6 +2011,8 @@ class HudApp {
         this._wazeWant();
         this.layoutSlots = layout.slots || [];
         this.layoutTheme = layout.theme && THEMES[layout.theme] ? layout.theme : null;
+        // a layout may name its own car's engine peaks ("engine": { torqueNm, powerKw }), e.g. the 330e's B48, for powerPct / torquePct
+        this.layoutEngine = layout.engine && typeof layout.engine === 'object' ? layout.engine : null;
         this.themeName = this._themeName();
         this.theme = THEMES[this.themeName] || THEMES.classic;
         this.hudHoliday = this._hudHoliday();      // the HUD's holiday colours (hud_holiday.js), null for none
@@ -2372,6 +2395,28 @@ class HudApp {
             c.uniform(ref, 'u_trail', new Array(32).fill(0), { type: 'vec4' });
             x.gEnv = this._gEnvAsset(x);
             if (x.gEnv) c.bind(ref, 'u_env', x.gEnv);
+        } else if (w.type === 'pdash') {
+            // up to two premium dials (shaders.js pdash): positions in target px, colours as theme roles
+            const ds = (w.dials || []).slice(0, 2), v4 = (f) => { const o = []; for (let i = 0; i < 2; i++) o.push.apply(o, ds[i] ? f(ds[i]) : [0, 0, 0, 0]); return o; };
+            const c4 = (k, def) => v4((d) => { const q = rgb(color(t, (d.colors || [])[k] || def)); return [q[0], q[1], q[2], 0]; });
+            c.uniform(ref, 'u_size', [w.w, w.h]);
+            c.uniform(ref, 'u_bg', rgba(color(t, w.color || 'bg')));
+            c.uniform(ref, 'u_n', [ds.length]);
+            c.uniform(ref, 'u_dial', v4((d) => [d.cx - w.x, d.cy - w.y, d.r, d.band || 26]), { type: 'vec4' });
+            c.uniform(ref, 'u_ang', v4((d) => [d.start * Math.PI / 180, d.sweep * Math.PI / 180, d.ticks || 40, d.major || 5]), { type: 'vec4' });
+            c.uniform(ref, 'u_val', v4((d) => [0, this._pdashRed(d), isNum(d.glow) ? d.glow : 0.8, d.bezel === false ? 0 : 1]), { type: 'vec4' });
+            c.uniform(ref, 'u_ca', c4(0, 'accent'), { type: 'vec4' });
+            c.uniform(ref, 'u_cb', c4(1, 'accent'), { type: 'vec4' });
+            c.uniform(ref, 'u_cc', c4(2, 'hot'), { type: 'vec4' });
+            c.uniform(ref, 'u_trackC', rgba(color(t, w.trackColor || 'track')));
+            c.uniform(ref, 'u_tickC', rgba(color(t, w.tickColor || 'dim')));
+            c.uniform(ref, 'u_redC', rgb(t.hot));
+            c.uniform(ref, 'u_bezelC', rgb(color(t, w.bezelColor || 'line')));
+            c.uniform(ref, 'u_flash', [0]);
+            const S = w.stripe;     // [x, y, w, h] target px: the slanted M stripe
+            c.uniform(ref, 'u_stripe', S ? [S[0] - w.x, S[1] - w.y, S[2], S[3]] : [0, 0, 0, 0]);
+            c.uniform(ref, 'u_s1', rgb(M_STRIPE[0])); c.uniform(ref, 'u_s2', rgb(M_STRIPE[1])); c.uniform(ref, 'u_s3', rgb(M_STRIPE[2]));
+            x.last = null;
         } else if (w.type === 'revarc') {
             const max = this._barMax(), red = this.setting('redline');
             const midAt = t.bar.midAt === 'shift' ? (red - 1500) / max : t.bar.midAt;
@@ -2803,6 +2848,20 @@ class HudApp {
             x.last = key;
             x.c.uniform(x.ref, 'u_value', [q]);
             x.c.uniform(x.ref, 'u_flash', [this.flash ? 1 : 0]);
+        } else if (w.type === 'pdash') {
+            const ds = (w.dials || []).slice(0, 2), vals = [];
+            let anyRpm = false;
+            for (let i = 0; i < 2; i++) {
+                const d = ds[i];
+                vals.push(d ? Math.round(this._pdashFrac(d) * 600) / 600 : 0, d ? this._pdashRed(d) : 2, d && isNum(d.glow) ? d.glow : 0.8, d && d.bezel === false ? 0 : 1);
+                if (d && d.signal === 'rpm') anyRpm = true;
+            }
+            const fl = anyRpm && this.flash ? 1 : 0;
+            const key = vals.join(',') + '|' + fl;
+            if (!force && key === x.last) return;
+            x.last = key;
+            x.c.uniform(x.ref, 'u_val', vals, { type: 'vec4' });
+            x.c.uniform(x.ref, 'u_flash', [fl]);
         } else if (w.type === 'shiftbar' || w.type === 'revarc') {
             const rpm = this._raw('rpm');
             const segs = w.segments || (w.type === 'revarc' ? 30 : 40);

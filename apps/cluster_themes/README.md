@@ -123,7 +123,21 @@ Calm and premium. One ribbon of light runs along under the top edge of the clust
 <p align="center"><img src="../../docs/images/cluster-ribbon.png" width="900" alt="Ribbon theme"></p>
 <p align="center"><img src="../../docs/images/cluster-ribbon-christmas.png" width="900" alt="Ribbon theme, Christmas edition"></p>
 
-Minimal, Track, Drag, Rally, Retro 80s, Cruise, Dyno and Ribbon have no map window yet; with "Show Waze map inside the theme" on, Waze stays in its usual place while they show.
+### M Performance, M Competition and i Electric
+
+Three dial themes drawn by one GPU shader each (`pdash`: gradient bands with a glow and a bright tip, tick marks, the red zone from your Redline setting, chrome bezels), made on a 330e (G21) for iDrive 7. The layouts are written by `tools/gen_dials.py`; edit that and run it again instead of editing the JSON.
+
+- **M Performance:** twin chrome-ringed dials, speed and revs, filling M light blue to M blue to M red. Between them: shift lights, the slanted M stripe, a huge gear that turns red at the shift point, the drive mode, and oil, water and engine kW. BMW's own gear letter shows in the middle of the rev dial.
+- **M Competition:** one big rev dial in the middle, heating white to amber to M red, with a huge gear, the speed and the drive mode inside it. Oil, water and power with bars on the left; battery, fuel and the g-forces (lateral, braking or accelerating, best this drive) on the right.
+- **i Electric:** BMW i blue and electric cyan, two glowing dials: the speed, and a plug-in hybrid's high-voltage battery with BMW's gear letter inside it. In the middle, ENGINE ON / OFF, the drive mode, engine kW, fuel and your average speed.
+
+M Competition and i Electric show engine power against a B48's 135 kW (the 330e's petrol engine; the electric motor's share is not on any signal the app reads). Not yet checked on a car: the battery reading (the battery unit's read is untested on a hybrid), and ENGINE OFF, which assumes the car reports 0 rpm while the petrol engine is off.
+
+<p align="center"><img src="../../docs/images/cluster-mperf.png" width="900" alt="M Performance theme"></p>
+<p align="center"><img src="../../docs/images/cluster-mcomp.png" width="900" alt="M Competition theme"></p>
+<p align="center"><img src="../../docs/images/cluster-ielec.png" width="900" alt="i Electric theme"></p>
+
+Minimal, Track, Drag, Rally, Retro 80s, Cruise, Dyno, Ribbon, M Performance, M Competition and i Electric have no map window yet; with "Show Waze map inside the theme" on, Waze stays in its usual place while they show.
 
 More themes are on the way.
 
