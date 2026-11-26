@@ -1769,7 +1769,7 @@ const PDASH = `// pdash: up to two round gauges in ONE cluster-render "effect" l
 //   u_ang[i]   start, sweep (radians clockwise from 12 o'clock), ticks, long tick every n
 //   u_val[i]   value 0..1, red zone from 0..1 (over 1: none), glow 0..1, bezel 0 / 1
 //   u_sty[i]   flags (1 needle, 2 band, 4 face), tick length scale, gradient colours (a + 8 b + 64 c, indices into
-//              u_pal: the stops at 0, 0.55 and 1 of the sweep), unused
+//              u_pal: the stops at 0, 0.55 and 1 of the sweep), red zone block width px (0: a thin arc outside)
 // u_pal[2] the colour table (rgb, a unused); kept small: a G21 restarted near 70 uniform vectors (shader_budget.js).
 // u_n dials in use; u_flash 1: the lit bands flash white (the shift point). v_uv (0,0) is the top-left.
 precision mediump float;
@@ -1861,7 +1861,9 @@ void main() {
             float tick = clamp(tW + 0.5 - along, 0.0, 1.0) * clamp(rr - tIn + 0.5, 0.0, 1.0) * clamp(inner - 8.0 * S.y - rr + 0.5, 0.0, 1.0);
             vec3 tc = (k / A.z >= V.y) ? u_redC : u_tickC.rgb;
             col = mix(col, tc, tick * u_tickC.a);
-            float red = step(V.y, f) * clamp(rr - D.z - 5.0 + 0.5, 0.0, 1.0) * clamp(D.z + 10.0 - rr + 0.5, 0.0, 1.0);
+            // the red zone: a thin arc outside the dial, or (u_sty.w > 0) a block that wide inside its outer edge (an F80 M3's)
+            float rLo = S.w > 0.0 ? D.z - S.w : D.z + 5.0, rHi = S.w > 0.0 ? D.z : D.z + 10.0;
+            float red = step(V.y, f) * clamp(rr - rLo + 0.5, 0.0, 1.0) * clamp(rHi - rr + 0.5, 0.0, 1.0);
             col = mix(col, u_redC, red);
         }
         if (V.w > 0.5 && (rel <= A.y + 0.08 || rel >= 2.0 * PI - 0.08 || hasFace > 0.5)) {

@@ -2462,7 +2462,7 @@ class HudApp {
             const idx = (r) => { let i = roles.indexOf(r); if (i < 0 && roles.length < 4) { roles.push(r); i = roles.length - 1; } return Math.max(0, i); };
             const sty = v4((d) => {
                 const cs = d.colors || [], ia = idx(cs[0] || 'accent'), ib = idx(cs[1] || cs[0] || 'accent'), ic = idx(cs[2] || 'hot');
-                return [(d.needle ? 1 : 0) + (d.band === 0 ? 0 : 2) + (d.face ? 4 : 0), isNum(d.tickScale) ? d.tickScale : 1, ia + 8 * ib + 64 * ic, 0];
+                return [(d.needle ? 1 : 0) + (d.band === 0 ? 0 : 2) + (d.face ? 4 : 0), isNum(d.tickScale) ? d.tickScale : 1, ia + 8 * ib + 64 * ic, d.redW || 0];
             });
             const pal = []; for (let i = 0; i < 4; i++) { const q = rgb(color(t, roles[i] || 'accent')); pal.push(q[0], q[1], q[2], 0); }
             c.uniform(ref, 'u_sty', sty, { type: 'vec4' });

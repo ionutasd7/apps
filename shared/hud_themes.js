@@ -205,10 +205,10 @@ const THEMES = {
         glow: 0, stripe: false,
         bar: { low: [47, 140, 255], mid: [47, 140, 255], high: [255, 42, 42], midAt: 'shift' },
         rev: { from: [47, 140, 255], to: [47, 140, 255] },
-        bg: [0, 0, 0, 255], panel: [8, 9, 11, 255], line: [196, 200, 208, 255], head: [255, 84, 24, 255],
+        bg: [0, 0, 0, 255], panel: [22, 24, 28, 255], line: [214, 218, 226, 255], head: [255, 84, 24, 255],
         ink: [12, 12, 14, 255], accent: [255, 84, 24, 255], well: [0, 0, 0, 255],
         ev: [47, 140, 255, 255], evlo: [26, 79, 208, 255], teal: [0, 196, 170, 255],
-        ok: [53, 208, 127, 255], warning: [255, 176, 32, 255], frame: [70, 82, 100, 255],
+        ok: [53, 208, 127, 255], warning: [255, 176, 32, 255], frame: [70, 82, 100, 255], needle: [255, 46, 24, 255],
     },
     // Ribbon (layout ribbon.json, Nov 13 2026): calm and premium. One ribbon of light under the hood line fills with the
     // revs (cool white, warming to amber, red at the top), a huge thin speed, thin side columns. Extra roles: gear (the
