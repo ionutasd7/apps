@@ -4,6 +4,7 @@ gen_dials.py - writes the dial themes drawn by the "pdash" shader (shared/shader
     M Performance  apps/cluster_themes/hud/layouts/mperf.json  twin chrome dials in M colours, M stripe, big gear
     M Competition  apps/cluster_themes/hud/layouts/mcomp.json  one big rev dial, huge gear, race data both sides
     i Electric     apps/cluster_themes/hud/layouts/ielec.json  glowing speed + hybrid battery dials in BMW i blue
+    Heritage       apps/cluster_themes/hud/layouts/heritage.json  needles and chrome, trip computer, status pill
 
     python3 tools/gen_dials.py            # from the repo root; edit this file, not the JSON
 
@@ -57,9 +58,9 @@ def dial(cx, cy, r, signal, colors, start=225, sweep=270, band=24, ticks=40, maj
     return d
 
 
-def pdash(dials, stripe=None, **kw):
-    d = {'id': 'dash', 'type': 'pdash', 'class': 'content', 'z': 1, 'x': 0, 'y': 0, 'w': 1920, 'h': 660, 'dials': dials,
-         'color': 'bg', 'conn': 0}
+def pdash(dials, stripe=None, id_='dash', rect=(0, 0, 1920, 660), **kw):
+    d = {'id': id_, 'type': 'pdash', 'class': 'content', 'z': 1, 'x': rect[0], 'y': rect[1], 'w': rect[2], 'h': rect[3],
+         'dials': dials, 'color': 'bg', 'conn': 0}
     if stripe:
         d['stripe'] = stripe
     d.update(kw)
@@ -226,8 +227,73 @@ def ielec():
     }
 
 
+def heritage():
+    """Old and new: needles and chrome over a modern blue band, a trip computer and a status pill."""
+    r = 250
+    rcx, rcy = GB_C
+    lcx = 1920 - rcx
+    common = dict(needle=True, face=True, glow=0.6)
+    spd = dial(lcx, rcy, r, 'speed', ['evlo', 'ev', 'ev'], ticks=32, major=4, band=8, **common)
+    fuel = dial(lcx, rcy + 140, 58, 'fuel', ['hot', 'fg', 'fg'], start=240, sweep=240, ticks=8, major=4, band=4,
+                min=0, max=1, needle=True, glow=0.2, bezel=False, tickScale=0.45)
+    tach = dial(rcx, rcy, r, 'rpm', ['evlo', 'ev', 'ev'], ticks=35, major=5, band=8, max=7000, **common)
+    hv = dial(rcx, rcy + 140, 58, 'hvSoc', ['teal', 'ev', 'ev'], start=240, sweep=240, ticks=8, major=4, band=4,
+              min=0, max=100, needle=True, glow=0.4, bezel=False, tickScale=0.45)
+    oil = dial(830, 300, 72, 'oil', ['ev', 'ev', 'ev'], ticks=10, major=5, band=4, min=50, max=150, red=130,
+               needle=True, face=True, glow=0.3, tickScale=0.5)
+    wat = dial(1090, 300, 72, 'coolant', ['ev', 'ev', 'ev'], ticks=8, major=4, band=4, min=50, max=130, red=115,
+               needle=True, face=True, glow=0.3, tickScale=0.5)
+    pill = [760, 590, 400, 46]
+    w = [fill('bg', 0, 0, 1920, 660),
+         pdash([spd, fuel], id_='dash_l', rect=(0, 60, 700, 600), needleColor='accent', faceColor='panel'),
+         pdash([tach, hv], id_='dash_r', rect=(1220, 60, 700, 600), needleColor='accent', faceColor='panel'),
+         pdash([oil, wat], id_='dash_m', rect=(700, 200, 520, 460), needleColor='accent', faceColor='panel', pill=pill)]
+    w += labels('spd_l', spd, ['{{spd:%d}}' % i for i in range(SPEED_MARKS)], 'r_label', 'fg', inset=46)
+    w += labels('rpm_l', tach, [str(i) for i in range(8)], 'r_label', 'fg', inset=46)
+    # inside the speedo: the speed in numbers (the modern touch) and the fuel gauge's ends
+    w += [ctext('speed', lcx, rcy - 92, 200, '{{speed}}', 'c_val'),
+          ctext('speed_u', lcx, rcy - 54, 120, '{{u:speedLc}}', 'r_label', 'dim'),
+          ctext('fuel_e', lcx - 52, rcy + 178, 30, 'E', 'r_label', 'hot'),
+          ctext('fuel_f', lcx + 52, rcy + 178, 30, 'F', 'r_label', 'fg'),
+          ctext('fuel_v', lcx, rcy + 212, 120, '{{fuelPct}} %', 'r_label', 'dim')]
+    # inside the tach: its unit over BMW's gear box, the hybrid battery gauge under it
+    w += [ctext('rpm_x', rcx, rcy - 84, 200, '1/MIN X1000', 'r_label', 'dim', spacing=1),
+          ctext('hv_0', rcx - 52, rcy + 178, 30, '0', 'r_label', 'dim'),
+          ctext('hv_1', rcx + 48, rcy + 178, 50, '100', 'r_label', 'dim'),
+          ctext('hv_v', rcx, rcy + 212, 160, 'HV {{hvSoc}} %', 'r_label', 'ev')]
+    # the middle: date and drive mode, oil and water, the trip computer, the status pill
+    w += [ctext('date', 960, 150, 360, '{{date}}', 'r_label', 'fg', spacing=2),
+          ctext('mode', 960, 186, 300, '{{mode}}', 'm_label', 'accent', spacing=3),
+          ctext('oil_v', 830, 360, 160, 'OIL {{oil}}°', 'r_label', 'fg'),
+          ctext('wat_v', 1090, 360, 160, 'WATER {{coolant}}°', 'r_label', 'fg')]
+    cols = [(720, 'TRIP', '{{trip}}', '{{u:distLc}}'), (893, 'TIME', '{{tripTime}}', 'h'),
+            (1066, 'AVERAGE', '{{avgSpeed}}', '{{u:speedLc}}'),
+            (720, 'FUEL', '{{tripFuel}}', 'l/100'), (893, 'BATT USED', '{{hvUsed}}', '%'),
+            (1066, 'E-RANGE', '{{eRange}}', '{{u:distLc}}')]
+    for i, (x, head, tok, unit) in enumerate(cols):
+        y = 404 + (i // 3) * 88
+        k = 'trip%d' % i
+        w += [text(k + '_h', x, y, 160, head, 'm_label', 'ev', 'left', spacing=2),
+              text(k, x - 24, y + 22, 124, tok, 'c_val', 'fg', 'right'),
+              text(k + '_u', x + 104, y + 45, 70, unit, 'r_label', 'dim', 'left')]
+    w += [text('status_ok', pill[0], pill[1] + 8, pill[2], 'ALL SYSTEMS OK', 'r_label', 'ok', spacing=3, showWhen='ok'),
+          text('status_warn', pill[0], pill[1] + 8, pill[2], '{{status}}', 'r_label', 'fg', spacing=2, showWhen='!ok')]
+    return {
+        'schemaVersion': 2, 'name': 'Heritage', 'theme': 'heritage', 'engine': {'powerKw': 135, 'torqueNm': 300},
+        '_about': 'Heritage cluster for iDrive 7 plug-in hybrids (made on a 330e G21), generated by tools/gen_dials.py (edit '
+                  'that and regenerate): old and new. Chrome-ringed speedo and tach with dark faces, white numerals and '
+                  'orange needles over a thin BMW i blue band, a classic fuel gauge in the speedo and the hybrid battery '
+                  'in the tach (BMW\'s gear letter in its middle); between them the date and drive mode, oil and water '
+                  'needles, a trip computer (distance, time, average speed, fuel per 100 km, battery used, estimated '
+                  'electric range) and a status pill: green ALL SYSTEMS OK, amber or red with the reason. Three pdash '
+                  'layers, two dials each. Clock, range and outside temperature along the bottom. Widget reference: '
+                  'shared/hud.js.',
+        'widgets': w + strip(),
+    }
+
+
 def main():
-    for name, fn in (('mperf', mperf), ('mcomp', mcomp), ('ielec', ielec)):
+    for name, fn in (('mperf', mperf), ('mcomp', mcomp), ('ielec', ielec), ('heritage', heritage)):
         with open(os.path.join(OUT, name + '.json'), 'w') as f:
             json.dump(fn(), f, indent=2)
             f.write('\n')

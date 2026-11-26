@@ -196,6 +196,20 @@ const THEMES = {
         ink: [12, 12, 14, 255], accent: [40, 140, 255, 255], well: [0, 0, 0, 255],
         deep: [16, 64, 190, 255], iblue: [40, 140, 255, 255], cyan: [130, 232, 255, 255], teal: [0, 196, 170, 255],
     },
+    // Heritage (layout heritage.json, tools/gen_dials.py): old and new. Chrome-ringed dials with a dark face, white numerals
+    // and BMW orange needles, a classic fuel gauge in the speedo; a thin BMW i blue band and glow, the hybrid battery,
+    // a trip computer and a status pill (green ALL SYSTEMS OK, amber, red). Extra roles: ev, evlo, teal, ok, warning.
+    heritage: {
+        name: 'Heritage',
+        fg: [242, 240, 234, 255], dim: [140, 147, 158, 255], track: [30, 36, 46, 255], arc: [47, 140, 255, 255],
+        glow: 0, stripe: false,
+        bar: { low: [47, 140, 255], mid: [47, 140, 255], high: [255, 42, 42], midAt: 'shift' },
+        rev: { from: [47, 140, 255], to: [47, 140, 255] },
+        bg: [0, 0, 0, 255], panel: [12, 15, 20, 255], line: [206, 211, 220, 255], head: [255, 106, 26, 255],
+        ink: [12, 12, 14, 255], accent: [255, 106, 26, 255], well: [0, 0, 0, 255],
+        ev: [47, 140, 255, 255], evlo: [26, 79, 208, 255], teal: [0, 196, 170, 255],
+        ok: [53, 208, 127, 255], warning: [255, 176, 32, 255],
+    },
     // Ribbon (layout ribbon.json, Nov 13 2026): calm and premium. One ribbon of light under the hood line fills with the
     // revs (cool white, warming to amber, red at the top), a huge thin speed, thin side columns. Extra roles: gear (the
     // gear number), ribbon (the line's gradient), greeting (the {{holiday}} text). holidays: true = the holiday

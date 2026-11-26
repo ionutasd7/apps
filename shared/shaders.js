@@ -1758,16 +1758,19 @@ void main() {
 `;
 
 
-const PDASH = `// pdash: up to two premium round gauges in ONE cluster-render "effect" layer (GLSL ES 1.00), the M Performance,
-// M Competition and i Electric themes' (tools/gen_dials.py). Over the background u_bg each dial draws: a soft tinted
-// well inside it, a lit band filled from the start to u_val.x along a three-stop gradient (u_ca at 0, u_cb at 0.55,
-// u_cc at 1 of the sweep) with a glow round the lit part, the unlit band u_trackC, a bright tip line at the value,
-// tick marks inside the band (every u_ang.w-th one long), a thin red arc past u_val.y outside the band, and a chrome
-// bezel. Optional slanted three-colour stripe (the M stripe) in u_stripe. Array uniforms (vec4, 2 elements):
+const PDASH = `// pdash: up to two round gauges in ONE cluster-render "effect" layer (GLSL ES 1.00): the M Performance, M Competition,
+// i Electric and Heritage themes' (tools/gen_dials.py). Over the background u_bg each dial draws: an optional dial face
+// (u_faceC, a soft radial), a tinted well, a lit band filled from the start to u_val.x along a three-stop gradient
+// (u_ca at 0, u_cb at 0.55, u_cc at 1 of the sweep) with a glow, the unlit band u_trackC, tick marks (every u_ang.w-th
+// one long), a thin red arc past u_val.y outside the band, a chrome bezel, and an optional needle (u_needleC, tapered,
+// with a cap). Optional: the slanted M stripe (u_stripe) and a status pill (u_pill, outlined in u_pillC.rgb while
+// u_pillC.a > 0). Array uniforms (vec4, 2 elements):
 //   u_dial[i]  cx, cy (layer px, y down), outer r, band width
 //   u_ang[i]   start, sweep (radians clockwise from 12 o'clock), ticks, long tick every n
 //   u_val[i]   value 0..1, red zone from 0..1 (over 1: none), glow 0..1, bezel 0 / 1
-//   u_ca[i] u_cb[i] u_cc[i]  gradient stops (rgb, a unused)
+//   u_sty[i]   flags (1 needle, 2 band, 4 face), tick length scale, gradient colours (a + 8 b + 64 c, indices into
+//              u_pal: the stops at 0, 0.55 and 1 of the sweep), unused
+// u_pal[2] the colour table (rgb, a unused); kept small: a G21 restarted near 70 uniform vectors (shader_budget.js).
 // u_n dials in use; u_flash 1: the lit bands flash white (the shift point). v_uv (0,0) is the top-left.
 precision mediump float;
 varying vec2 v_uv;
@@ -1777,20 +1780,27 @@ uniform float u_n;
 uniform vec4 u_dial[2];
 uniform vec4 u_ang[2];
 uniform vec4 u_val[2];
-uniform vec4 u_ca[2];
-uniform vec4 u_cb[2];
-uniform vec4 u_cc[2];
+uniform vec4 u_sty[2];
+uniform vec4 u_pal[4];
 uniform vec4 u_trackC;
 uniform vec4 u_tickC;
 uniform vec3 u_redC;
 uniform vec3 u_bezelC;
+uniform vec3 u_needleC;
+uniform vec3 u_faceC;
 uniform float u_flash;
 uniform vec4 u_stripe;
-uniform vec3 u_s1;
-uniform vec3 u_s2;
-uniform vec3 u_s3;
+uniform vec4 u_pill;
+uniform vec4 u_pillC;
 
 const float PI = 3.14159265359;
+
+vec3 pal(float k) {
+    if (k < 0.5) return u_pal[0].rgb;
+    if (k < 1.5) return u_pal[1].rgb;
+    if (k < 2.5) return u_pal[2].rgb;
+    return u_pal[3].rgb;
+}
 
 vec3 grad(vec3 a, vec3 b, vec3 c, float f) {
     return f < 0.55 ? mix(a, b, smoothstep(0.0, 0.55, f)) : mix(b, c, smoothstep(0.55, 1.0, f));
@@ -1802,63 +1812,90 @@ void main() {
     for (int i = 0; i < 2; i++) {
         if (float(i) >= u_n) break;
         vec4 D = u_dial[i];
-        vec4 A = u_ang[i];
-        vec4 V = u_val[i];
         vec2 d = p - D.xy;
         float rr = length(d);
         if (rr > D.z + 60.0) continue;
+        vec4 A = u_ang[i];
+        vec4 V = u_val[i];
+        vec4 S = u_sty[i];
         float inner = D.z - D.w;
         float a = atan(d.x, -d.y);
         float rel = mod(a - A.x + 4.0 * PI, 2.0 * PI);
         float f = rel / A.y;
         bool inSweep = rel <= A.y;
-        vec3 ca = u_ca[i].rgb, cb = u_cb[i].rgb, cc = u_cc[i].rgb;
-        // the well: a faint tint of the dial's first colour, darkest at the centre
+        float ci = S.z;
+        vec3 ca = pal(mod(ci, 8.0)), cb = pal(mod(floor(ci / 8.0), 8.0)), cc = pal(floor(ci / 64.0));
+        float fl = S.x;
+        float hasNeedle = mod(fl, 2.0), hasBand = mod(floor(fl / 2.0), 2.0), hasFace = floor(fl / 4.0);
+        float val = clamp(V.x, 0.0, 1.0);
+        // the face: a soft radial, lighter towards the middle
+        if (hasFace > 0.5) col = mix(col, u_faceC * (1.0 - 0.55 * rr / D.z), clamp(D.z + 18.0 - rr, 0.0, 1.0));
         float well = smoothstep(inner - 4.0, inner * 0.35, rr) * clamp((inner - rr) / 6.0, 0.0, 1.0);
         col += ca * 0.07 * well;
-        // a ring of light under the band's inner edge
-        col += ca * 0.10 * exp(-abs(rr - inner + 2.0) / 3.0) * (inSweep ? 1.0 : 0.0);
         if (inSweep) {
-            float val = clamp(V.x, 0.0, 1.0);
-            float bandM = clamp(rr - inner + 0.5, 0.0, 1.0) * clamp(D.z - rr + 0.5, 0.0, 1.0);
-            float litEdge = clamp((val * A.y - rel) * rr + 0.5, 0.0, 1.0);
             vec3 g = grad(ca, cb, cc, f);
             if (u_flash > 0.5) g = vec3(1.0);
-            // lit band: brighter towards its outer edge
-            float shade = 0.72 + 0.28 * smoothstep(inner, D.z, rr);
-            vec3 lit = g * shade;
-            col = mix(col, u_trackC.rgb, u_trackC.a * bandM * (1.0 - litEdge));
-            col = mix(col, lit, bandM * litEdge);
-            // glow round the lit part
-            float dist = max(inner - rr, rr - D.z);
-            if (dist > 0.0) col += g * V.z * 0.55 * exp(-dist / 14.0) * litEdge;
-            // the tip
-            float tipD = abs(rel - val * A.y) * rr;
-            float tip = clamp(2.2 - tipD, 0.0, 1.0) * step(inner - 14.0, rr) * step(rr, D.z + 8.0) * step(0.004, val);
-            col = mix(col, vec3(1.0), tip);
-            col += g * 0.35 * exp(-tipD / 6.0) * step(inner - 14.0, rr) * step(rr, D.z + 8.0) * step(0.004, val);
+            if (hasBand > 0.5) {
+                col += ca * 0.10 * exp(-abs(rr - inner + 2.0) / 3.0);
+                float bandM = clamp(rr - inner + 0.5, 0.0, 1.0) * clamp(D.z - rr + 0.5, 0.0, 1.0);
+                float litEdge = clamp((val * A.y - rel) * rr + 0.5, 0.0, 1.0);
+                float shade = 0.72 + 0.28 * smoothstep(inner, D.z, rr);
+                col = mix(col, u_trackC.rgb, u_trackC.a * bandM * (1.0 - litEdge));
+                col = mix(col, g * shade, bandM * litEdge);
+                float dist = max(inner - rr, rr - D.z);
+                if (dist > 0.0) col += g * V.z * 0.55 * exp(-dist / 14.0) * litEdge;
+                if (hasNeedle < 0.5) {
+                    float tipD = abs(rel - val * A.y) * rr;
+                    float tip = clamp(2.2 - tipD, 0.0, 1.0) * step(inner - 14.0, rr) * step(rr, D.z + 8.0) * step(0.004, val);
+                    col = mix(col, vec3(1.0), tip);
+                    col += g * 0.35 * exp(-tipD / 6.0) * step(inner - 14.0, rr) * step(rr, D.z + 8.0) * step(0.004, val);
+                }
+            }
             // ticks inside the band
             float ft = f * A.z;
             float k = floor(ft + 0.5);
             float along = abs(ft - k) / A.z * A.y * rr;
             bool major = mod(k, A.w) < 0.5;
-            float tIn = major ? inner - 30.0 : inner - 18.0;
+            float tIn = inner - (major ? 30.0 : 18.0) * S.y;
             float tW = major ? 1.6 : 0.9;
-            float tick = clamp(tW + 0.5 - along, 0.0, 1.0) * clamp(rr - tIn + 0.5, 0.0, 1.0) * clamp(inner - 8.0 - rr + 0.5, 0.0, 1.0);
+            float tick = clamp(tW + 0.5 - along, 0.0, 1.0) * clamp(rr - tIn + 0.5, 0.0, 1.0) * clamp(inner - 8.0 * S.y - rr + 0.5, 0.0, 1.0);
             vec3 tc = (k / A.z >= V.y) ? u_redC : u_tickC.rgb;
             col = mix(col, tc, tick * u_tickC.a);
-            // the red zone outside the band
             float red = step(V.y, f) * clamp(rr - D.z - 5.0 + 0.5, 0.0, 1.0) * clamp(D.z + 10.0 - rr + 0.5, 0.0, 1.0);
             col = mix(col, u_redC, red);
         }
-        // chrome bezel round the sweep, its shine moving with the angle
-        if (V.w > 0.5 && (rel <= A.y + 0.08 || rel >= 2.0 * PI - 0.08)) {
-            float bz = clamp(1.6 - abs(rr - D.z - 22.0), 0.0, 1.0);
+        if (V.w > 0.5 && (rel <= A.y + 0.08 || rel >= 2.0 * PI - 0.08 || hasFace > 0.5)) {
+            float bw = max(1.6, D.z * 0.012);
+            float bz = clamp(bw - abs(rr - D.z - (hasFace > 0.5 ? 18.0 : 22.0)), 0.0, 1.0);
             float shine = 0.35 + 0.65 * pow(abs(sin(a * 1.3 + 0.6)), 3.0);
             col = mix(col, u_bezelC * shine, bz);
         }
     }
-    // the stripe: three slanted bars
+    // the needles, over every dial (a sub-dial drawn after a big one never hides its needle)
+    for (int i = 0; i < 2; i++) {
+        if (float(i) >= u_n) break;
+        vec4 D = u_dial[i];
+        if (mod(u_sty[i].x, 2.0) < 0.5) continue;
+        vec2 d = p - D.xy;
+        float rr = length(d);
+        if (rr > D.z) continue;
+        float inner = D.z - D.w;
+        float val = clamp(u_val[i].x, 0.0, 1.0);
+        // the needle: tapered from the cap to 0.88 r, a short tail, a glow, the cap on top
+            float na = u_ang[i].x + val * u_ang[i].y;
+            vec2 dir = vec2(sin(na), -cos(na));
+            float t = dot(d, dir);
+            float perp = abs(d.x * dir.y - d.y * dir.x);
+            float len = inner - 6.0, tail = D.z * 0.16;
+            float wid = mix(D.z * 0.022 + 1.5, 1.2, clamp(t / len, 0.0, 1.0));
+            float on = step(-tail, t) * step(t, len);
+            float nd = perp - wid;
+            col += u_needleC * 0.45 * exp(-max(nd, 0.0) / 5.0) * on;
+            col = mix(col, u_needleC, clamp(0.5 - nd, 0.0, 1.0) * on);
+            float capR = D.z * 0.075 + 4.0;
+            col = mix(col, u_bezelC * 0.25, clamp(capR - rr + 0.5, 0.0, 1.0));
+            col = mix(col, u_bezelC * 0.7, clamp(1.2 - abs(rr - capR), 0.0, 1.0));
+    }
     if (u_stripe.z > 0.0) {
         vec2 q = p - u_stripe.xy;
         if (q.y >= 0.0 && q.y <= u_stripe.w) {
@@ -1868,10 +1905,18 @@ void main() {
                 float j = floor(xs / bw);
                 float e = min(xs - j * bw, bw - (xs - j * bw));
                 float m = clamp(e - 2.0, 0.0, 1.0);
-                vec3 sc = j < 0.5 ? u_s1 : (j < 1.5 ? u_s2 : u_s3);
+                vec3 sc = j < 0.5 ? vec3(0.310, 0.706, 1.0) : (j < 1.5 ? vec3(0.184, 0.357, 0.847) : vec3(0.910, 0.149, 0.176));   // shared/hud_themes.js M_STRIPE
                 col = mix(col, sc, m);
             }
         }
+    }
+    // the status pill: a rounded outline with a faint fill in the status colour
+    if (u_pillC.a > 0.0 && u_pill.z > 0.0) {
+        vec2 h = u_pill.zw * 0.5;
+        vec2 q = abs(p - u_pill.xy - h) - (h - vec2(h.y));
+        float sd = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - h.y;
+        col = mix(col, u_pillC.rgb * 0.16, clamp(0.5 - sd, 0.0, 1.0));
+        col = mix(col, u_pillC.rgb, clamp(1.5 - abs(sd + 1.0), 0.0, 1.0));
     }
     gl_FragColor = vec4(col, u_bg.a);
 }

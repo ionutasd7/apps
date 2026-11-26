@@ -364,6 +364,7 @@ function mediaText(v) {
 /** Seconds as m:ss. */
 function clockOf(sec) { const t = Math.max(0, Math.floor(sec)); return Math.floor(t / 60) + ':' + ('0' + (t % 60)).slice(-2); }   // its speed scale: 0..200 mph by 20, 0..330 km/h by 30 (linear)
 const ROAD_DASH_M = 12;            // the Sport road: metres per dash and gap (shaders.js sdash u_road)
+const PDASH_N = 2;                 // shaders.js pdash: dials per layer (more dials: more pdash widgets)
 const CUE_TYPES = { lights: true, shiftbar: true, revbar: true, revarc: true, ribbon: true, mtach: true, pdash: true };
 // the shift-light test (page.js Alerts): rpm climbs from TEST_FROM to just past the shift point, then holds
 const TEST_FROM = 1500, TEST_CLIMB_MS = 2500, TEST_HOLD_MS = 1200;
@@ -1547,6 +1548,40 @@ class HudApp {
         return isNum(lim) && lim > 0 && isNum(v) && v > lim ? id : null;
     }
 
+    /**
+     * This drive's trip computer: km, minutes since the start, fuel used per 100 km (from the tank's litres at the start,
+     * so only once 5 km are driven and a litre or more is gone; a fill-up starts it again) and the hybrid battery used.
+     */
+    _tripData() {
+        const d = this.car.data();
+        if (d.demo) return { km: 23.4, min: 34, l100: 4.8, hvUsed: 18 };
+        const now = Date.now(), fuel = this.fuelL, soc = this._raw('hvSoc');
+        if (!this.tripStart) this.tripStart = now;
+        if (isNum(fuel) && (!isNum(this.tripFuel0) || fuel > this.tripFuel0 + 2)) { this.tripFuel0 = fuel; this.tripFuelKm0 = this.tripKm; }
+        if (isNum(soc) && !isNum(this.tripSoc0)) this.tripSoc0 = soc;
+        const used = isNum(fuel) && isNum(this.tripFuel0) ? this.tripFuel0 - fuel : null, km = this.tripKm - (this.tripFuelKm0 || 0);
+        return {
+            km: this.tripKm, min: (now - this.tripStart) / 60000,
+            l100: isNum(used) && used >= 1 && km >= 5 ? used / km * 100 : null,
+            hvUsed: isNum(soc) && isNum(this.tripSoc0) ? Math.max(0, this.tripSoc0 - soc) : null,
+        };
+    }
+    /**
+     * The status line: { level 0 ok / 1 heads-up / 2 warning, msg }. Only from what the app reads: oil and coolant over their
+     * warning limits (Alerts tab), a tyre under 1.9 bar, fuel under 10 %, a cold engine. BMW's own check-control messages
+     * are not on any signal the app reads, so ALL SYSTEMS OK means these readings are fine, not that the car has no fault.
+     */
+    _health() {
+        const oil = this._raw('oil'), cool = this._raw('coolant'), fuel = this._raw('fuel'), rpm = this._raw('rpm');
+        const wo = this.setting('warnOil') || 130, wc = this.setting('warnCoolant') || 115;
+        if (isNum(oil) && oil > wo) return { level: 2, msg: 'OIL TEMPERATURE HIGH' };
+        if (isNum(cool) && cool > wc) return { level: 2, msg: 'COOLANT TEMPERATURE HIGH' };
+        const low = TYRE_CORNERS.filter((k) => isNum(this.tyres.p[k]) && this.tyres.p[k] < 1.9);
+        if (low.length) return { level: 2, msg: 'TYRE PRESSURE LOW ' + low.join(' ') };
+        if (isNum(fuel) && fuel < 0.1) return { level: 1, msg: 'FUEL LOW' };
+        if (isNum(oil) && oil < 60 && isNum(rpm) && rpm > 300) return { level: 1, msg: 'ENGINE WARMING UP' };
+        return { level: 0, msg: 'ALL SYSTEMS OK' };
+    }
     /** pdash: a dial's value 0..1. speed runs along SPEED_SCALE (BMW's own uneven speedo), rpm to "max" (7000). */
     _pdashFrac(d) {
         const v = this._raw(d.signal);
@@ -1740,6 +1775,10 @@ class HudApp {
             if (name === 'range') return isNum(this.rangeKm) ? this.rangeKm : demo ? 368 : null;
             return isNum(this.ambient) ? this.ambient : demo ? 24 : null;
         }
+        if (name === 'eRange') {     // km on the battery alone, estimated: charge x the setting "evRangeFull" (km at 100 %)
+            const soc = this._raw('hvSoc');
+            return isNum(soc) ? soc / 100 * (this.ctx.settings.item('evRangeFull') ? this.setting('evRangeFull') : 45) : null;
+        }
         if (name === 'torquePct' || name === 'powerPct') {
             // the car's own sport display % while it sends one, else from the crank torque and app.json
             // config.engine's peaks (an M40i makes 500 Nm, 285 kW)
@@ -1846,6 +1885,14 @@ class HudApp {
                 return String(Math.round(us ? kw * 1.341 : kw));
             }
             case 'hvSoc': { const v = this._raw('hvSoc'); return isNum(v) ? String(Math.round(v)) : '--'; }
+            // Heritage: the trip computer, the date, an estimated electric range and the status line
+            case 'date': { const d = this._localDate(), wd = new Date(Date.UTC(d.y, d.m - 1, d.d)).getUTCDay(); return ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][wd] + ' ' + ('0' + d.d).slice(-2) + '.' + ('0' + d.m).slice(-2) + '.' + d.y; }
+            case 'trip': { const v = this._tripData().km; return isNum(v) ? (us ? v * 0.621371 : v).toFixed(1) : '--'; }
+            case 'tripTime': { const v = this._tripData().min; return isNum(v) ? Math.floor(v / 60) + ':' + ('0' + Math.floor(v % 60)).slice(-2) : '--'; }
+            case 'tripFuel': { const v = this._tripData().l100; return isNum(v) ? v.toFixed(1) : '--'; }
+            case 'hvUsed': { const v = this._tripData().hvUsed; return isNum(v) ? String(Math.round(v)) : '--'; }
+            case 'eRange': { const v = this._raw('eRange'); return isNum(v) ? String(Math.round(us ? v * 0.621371 : v)) : '--'; }
+            case 'status': return this._health().msg;
             // a plug-in hybrid's combustion engine running or not (ENGINE ON / ENGINE OFF): rpm under 300 counts as off
             case 'engineState': { const v = this._raw('rpm'); return isNum(v) ? (v < 300 ? 'ENGINE OFF' : 'ENGINE ON') : '--'; }
             case 'fuelPct': { const v = this._raw('fuel'); return isNum(v) ? String(Math.round(v * 100)) : '--'; }
@@ -2396,26 +2443,36 @@ class HudApp {
             x.gEnv = this._gEnvAsset(x);
             if (x.gEnv) c.bind(ref, 'u_env', x.gEnv);
         } else if (w.type === 'pdash') {
-            // up to two premium dials (shaders.js pdash): positions in target px, colours as theme roles
-            const ds = (w.dials || []).slice(0, 2), v4 = (f) => { const o = []; for (let i = 0; i < 2; i++) o.push.apply(o, ds[i] ? f(ds[i]) : [0, 0, 0, 0]); return o; };
-            const c4 = (k, def) => v4((d) => { const q = rgb(color(t, (d.colors || [])[k] || def)); return [q[0], q[1], q[2], 0]; });
+            // up to six round dials (shaders.js pdash): positions in target px, colours as theme roles
+            const ds = (w.dials || []).slice(0, PDASH_N), v4 = (f) => { const o = []; for (let i = 0; i < PDASH_N; i++) o.push.apply(o, ds[i] ? f(ds[i]) : [0, 0, 0, 0]); return o; };
             c.uniform(ref, 'u_size', [w.w, w.h]);
             c.uniform(ref, 'u_bg', rgba(color(t, w.color || 'bg')));
             c.uniform(ref, 'u_n', [ds.length]);
             c.uniform(ref, 'u_dial', v4((d) => [d.cx - w.x, d.cy - w.y, d.r, d.band || 26]), { type: 'vec4' });
             c.uniform(ref, 'u_ang', v4((d) => [d.start * Math.PI / 180, d.sweep * Math.PI / 180, d.ticks || 40, d.major || 5]), { type: 'vec4' });
             c.uniform(ref, 'u_val', v4((d) => [0, this._pdashRed(d), isNum(d.glow) ? d.glow : 0.8, d.bezel === false ? 0 : 1]), { type: 'vec4' });
-            c.uniform(ref, 'u_ca', c4(0, 'accent'), { type: 'vec4' });
-            c.uniform(ref, 'u_cb', c4(1, 'accent'), { type: 'vec4' });
-            c.uniform(ref, 'u_cc', c4(2, 'hot'), { type: 'vec4' });
+            // the colour table: every role the dials name (at most 6), each dial's gradient as three indices into it
+            const roles = [];
+            const idx = (r) => { let i = roles.indexOf(r); if (i < 0 && roles.length < 4) { roles.push(r); i = roles.length - 1; } return Math.max(0, i); };
+            const sty = v4((d) => {
+                const cs = d.colors || [], ia = idx(cs[0] || 'accent'), ib = idx(cs[1] || cs[0] || 'accent'), ic = idx(cs[2] || 'hot');
+                return [(d.needle ? 1 : 0) + (d.band === 0 ? 0 : 2) + (d.face ? 4 : 0), isNum(d.tickScale) ? d.tickScale : 1, ia + 8 * ib + 64 * ic, 0];
+            });
+            const pal = []; for (let i = 0; i < 4; i++) { const q = rgb(color(t, roles[i] || 'accent')); pal.push(q[0], q[1], q[2], 0); }
+            c.uniform(ref, 'u_sty', sty, { type: 'vec4' });
+            c.uniform(ref, 'u_pal', pal, { type: 'vec4' });
             c.uniform(ref, 'u_trackC', rgba(color(t, w.trackColor || 'track')));
             c.uniform(ref, 'u_tickC', rgba(color(t, w.tickColor || 'dim')));
             c.uniform(ref, 'u_redC', rgb(t.hot));
             c.uniform(ref, 'u_bezelC', rgb(color(t, w.bezelColor || 'line')));
+            c.uniform(ref, 'u_needleC', rgb(color(t, w.needleColor || 'accent')));
+            c.uniform(ref, 'u_faceC', rgb(color(t, w.faceColor || 'panel')));
             c.uniform(ref, 'u_flash', [0]);
             const S = w.stripe;     // [x, y, w, h] target px: the slanted M stripe
             c.uniform(ref, 'u_stripe', S ? [S[0] - w.x, S[1] - w.y, S[2], S[3]] : [0, 0, 0, 0]);
-            c.uniform(ref, 'u_s1', rgb(M_STRIPE[0])); c.uniform(ref, 'u_s2', rgb(M_STRIPE[1])); c.uniform(ref, 'u_s3', rgb(M_STRIPE[2]));
+            const P = w.pill;       // [x, y, w, h] target px: the status pill (Heritage)
+            c.uniform(ref, 'u_pill', P ? [P[0] - w.x, P[1] - w.y, P[2], P[3]] : [0, 0, 0, 0]);
+            c.uniform(ref, 'u_pillC', [0, 0, 0, 0]);
             x.last = null;
         } else if (w.type === 'revarc') {
             const max = this._barMax(), red = this.setting('redline');
@@ -2656,6 +2713,8 @@ class HudApp {
         if (sw === '!media') return !this._mediaOn();
         if (sw === 'mapUp') return this.setting('mapUp') === true;
         if (sw === '!mapUp') return this.setting('mapUp') !== true;
+        if (sw === 'ok') return this._health().level === 0;
+        if (sw === '!ok') return this._health().level > 0;
         return true;
     }
 
@@ -2849,19 +2908,21 @@ class HudApp {
             x.c.uniform(x.ref, 'u_value', [q]);
             x.c.uniform(x.ref, 'u_flash', [this.flash ? 1 : 0]);
         } else if (w.type === 'pdash') {
-            const ds = (w.dials || []).slice(0, 2), vals = [];
+            const ds = (w.dials || []).slice(0, PDASH_N), vals = [];
             let anyRpm = false;
-            for (let i = 0; i < 2; i++) {
+            for (let i = 0; i < PDASH_N; i++) {
                 const d = ds[i];
                 vals.push(d ? Math.round(this._pdashFrac(d) * 600) / 600 : 0, d ? this._pdashRed(d) : 2, d && isNum(d.glow) ? d.glow : 0.8, d && d.bezel === false ? 0 : 1);
-                if (d && d.signal === 'rpm') anyRpm = true;
+                if (d && d.signal === 'rpm' && !d.needle) anyRpm = true;
             }
             const fl = anyRpm && this.flash ? 1 : 0;
-            const key = vals.join(',') + '|' + fl;
+            const hl = w.pill ? this._health().level : -1;
+            const key = vals.join(',') + '|' + fl + '|' + hl;
             if (!force && key === x.last) return;
             x.last = key;
             x.c.uniform(x.ref, 'u_val', vals, { type: 'vec4' });
             x.c.uniform(x.ref, 'u_flash', [fl]);
+            if (w.pill) { const pc = rgb(color(this.theme, ['ok', 'warning', 'hot'][hl] || 'ok')); x.c.uniform(x.ref, 'u_pillC', [pc[0], pc[1], pc[2], 1]); }
         } else if (w.type === 'shiftbar' || w.type === 'revarc') {
             const rpm = this._raw('rpm');
             const segs = w.segments || (w.type === 'revarc' ? 30 : 40);

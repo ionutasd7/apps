@@ -125,7 +125,7 @@ Calm and premium. One ribbon of light runs along under the top edge of the clust
 
 ### M Performance, M Competition and i Electric
 
-Three dial themes drawn by one GPU shader each (`pdash`: gradient bands with a glow and a bright tip, tick marks, the red zone from your Redline setting, chrome bezels), made on a 330e (G21) for iDrive 7. The layouts are written by `tools/gen_dials.py`; edit that and run it again instead of editing the JSON.
+dial themes drawn by GPU shaders (`pdash`: gradient bands with a glow and a bright tip, tick marks, the red zone from your Redline setting, chrome bezels), made on a 330e (G21) for iDrive 7. The layouts are written by `tools/gen_dials.py`; edit that and run it again instead of editing the JSON.
 
 - **M Performance:** twin chrome-ringed dials, speed and revs, filling M light blue to M blue to M red. Between them: shift lights, the slanted M stripe, a huge gear that turns red at the shift point, the drive mode, and oil, water and engine kW. BMW's own gear letter shows in the middle of the rev dial.
 - **M Competition:** one big rev dial in the middle, heating white to amber to M red, with a huge gear, the speed and the drive mode inside it. Oil, water and power with bars on the left; battery, fuel and the g-forces (lateral, braking or accelerating, best this drive) on the right.
@@ -137,7 +137,22 @@ M Competition and i Electric show engine power against a B48's 135 kW (the 330e'
 <p align="center"><img src="../../docs/images/cluster-mcomp.png" width="900" alt="M Competition theme"></p>
 <p align="center"><img src="../../docs/images/cluster-ielec.png" width="900" alt="i Electric theme"></p>
 
-Minimal, Track, Drag, Rally, Retro 80s, Cruise, Dyno, Ribbon, M Performance, M Competition and i Electric have no map window yet; with "Show Waze map inside the theme" on, Waze stays in its usual place while they show.
+### Heritage
+
+Old and new together, for a plug-in hybrid. Chrome-ringed speedo and tach with dark faces, white numerals and orange needles over a thin BMW i blue band, a classic fuel gauge (E to F) in the bottom of the speedo and the hybrid battery in the bottom of the tach, with BMW's gear letter in the tach's middle. Between them:
+
+- the date and the drive mode, small oil and water needle gauges with their temperatures;
+- a trip computer for this drive: distance, time, average speed, fuel per 100 km, hybrid battery used and an estimated electric range;
+- a status pill: green **ALL SYSTEMS OK**, amber (fuel low, engine warming up) or red (oil or coolant over your warning limits, a tyre under 1.9 bar) with the reason.
+
+Clock, range and outside temperature run along the bottom as in the other themes.
+
+What the numbers are: fuel per 100 km comes from the tank's litres since the start of the drive, so it shows only after 5 km and once a litre is used (a fill-up starts it again). The electric range is an estimate: battery charge x **Electric range on a full battery** (Settings, 45 km by default), not BMW's own figure. The status pill only knows what the app reads; BMW's own check-control messages are not on any signal the app has, so ALL SYSTEMS OK means these readings are fine, not that the car has no fault.
+
+<p align="center"><img src="../../docs/images/cluster-heritage.png" width="900" alt="Heritage theme"></p>
+<p align="center"><img src="../../docs/images/cluster-heritage-ok.png" width="900" alt="Heritage theme, all systems OK"></p>
+
+Minimal, Track, Drag, Rally, Retro 80s, Cruise, Dyno, Ribbon, M Performance, M Competition, i Electric and Heritage have no map window yet; with "Show Waze map inside the theme" on, Waze stays in its usual place while they show.
 
 More themes are on the way.
 
