@@ -139,10 +139,10 @@ M Competition and i Electric show engine power against a B48's 135 kW (the 330e'
 
 ### Heritage
 
-Old and new together, for a plug-in hybrid. Chrome-ringed speedo and tach with dark faces, white numerals and orange needles over a thin BMW i blue band, a classic fuel gauge (E to F) in the bottom of the speedo and the hybrid battery in the bottom of the tach, with BMW's gear letter in the tach's middle. Between them:
+Old and new together, for a plug-in hybrid, always in km/h, km and °C whatever the Units setting says. Chrome-ringed speedo and tach with dark faces, white numerals and orange needles over a thin BMW i blue band; the coolant in the speedo's small dial, the oil in the tach's, and ENGINE ON / OFF in the tach. Fuel runs up a tall bar on the left edge and the hybrid battery on the right. In the middle a framed dash:
 
-- the date and the drive mode, small oil and water needle gauges with their temperatures;
-- a trip computer for this drive: distance, time, average speed, fuel per 100 km, hybrid battery used and an estimated electric range;
+- the date, the drive mode, the gear (red at the shift point) and the engine's power;
+- a trip computer for this drive: distance, time, average speed, fuel per 100 km, an estimated electric range and the hybrid battery used;
 - a status pill: green **ALL SYSTEMS OK**, amber (fuel low, engine warming up) or red (oil or coolant over your warning limits, a tyre under 1.9 bar) with the reason.
 
 Clock, range and outside temperature run along the bottom as in the other themes.
@@ -150,7 +150,6 @@ Clock, range and outside temperature run along the bottom as in the other themes
 What the numbers are: fuel per 100 km comes from the tank's litres since the start of the drive, so it shows only after 5 km and once a litre is used (a fill-up starts it again). The electric range is an estimate: battery charge x 45 km (the setting `evRangeFull`, not on the center-screen page yet), not BMW's own figure. The status pill only knows what the app reads; BMW's own check-control messages are not on any signal the app has, so ALL SYSTEMS OK means these readings are fine, not that the car has no fault.
 
 <p align="center"><img src="../../docs/images/cluster-heritage.png" width="900" alt="Heritage theme"></p>
-<p align="center"><img src="../../docs/images/cluster-heritage-ok.png" width="900" alt="Heritage theme, all systems OK"></p>
 
 Minimal, Track, Drag, Rally, Retro 80s, Cruise, Dyno, Ribbon, M Performance, M Competition, i Electric and Heritage have no map window yet; with "Show Waze map inside the theme" on, Waze stays in its usual place while they show.
 

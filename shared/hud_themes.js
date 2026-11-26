@@ -208,7 +208,7 @@ const THEMES = {
         bg: [0, 0, 0, 255], panel: [12, 15, 20, 255], line: [206, 211, 220, 255], head: [255, 106, 26, 255],
         ink: [12, 12, 14, 255], accent: [255, 106, 26, 255], well: [0, 0, 0, 255],
         ev: [47, 140, 255, 255], evlo: [26, 79, 208, 255], teal: [0, 196, 170, 255],
-        ok: [53, 208, 127, 255], warning: [255, 176, 32, 255],
+        ok: [53, 208, 127, 255], warning: [255, 176, 32, 255], frame: [70, 82, 100, 255],
     },
     // Ribbon (layout ribbon.json, Nov 13 2026): calm and premium. One ribbon of light under the hood line fills with the
     // revs (cool white, warming to amber, red at the top), a huge thin speed, thin side columns. Extra roles: gear (the

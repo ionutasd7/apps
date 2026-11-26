@@ -734,6 +734,9 @@ class HudApp {
     /** A setting's value, or its default when the saved value isn't one the schema allows. */
     setting(key) {
         // "mapUp": not saved, the Waze map is showing inside the theme now (the setting on, waze.js says so)
+        // a layout may fix its own units ("units": "metric" / "us", Heritage): speed, distance, temperature and pressure
+        if (this.layoutUnits && key === 'units') return this.layoutUnits;
+        if (this.layoutUnits && (key === 'tempUnits' || key === 'pressureUnits')) return 'speed';
         if (key === 'mapUp') return !!(this.waze && this.waze.up && this.ctx.settings.get('mapInTheme') === true);
         // "ribScale": not saved, the Ribbon's scale numbers to show: thousands on the bar, "c" while the camera dip is on
         if (key === 'ribScale') return String(this._barMax() / 1000) + (this._cameraOn() ? 'c' : '');
@@ -2039,7 +2042,7 @@ class HudApp {
         this.mapShown = this.setting('mapUp');
         if (name === 'off') {
             this._wazeWant();
-            this.problem = null; this.layoutTheme = null; this.layoutEngine = null; this.needsBoost = false; this.needsIntake = false; this.needsHv = false; this.needsFuel = false;
+            this.problem = null; this.layoutTheme = null; this.layoutEngine = null; this.layoutUnits = null; this.needsBoost = false; this.needsIntake = false; this.needsHv = false; this.needsFuel = false;
             this.log.info('off: nothing drawn, BMW\'s own ' + (this.target === 'panel' ? 'cluster' : 'HUD') + ' shows');
             return;
         }
@@ -2060,6 +2063,7 @@ class HudApp {
         this.layoutTheme = layout.theme && THEMES[layout.theme] ? layout.theme : null;
         // a layout may name its own car's engine peaks ("engine": { torqueNm, powerKw }), e.g. the 330e's B48, for powerPct / torquePct
         this.layoutEngine = layout.engine && typeof layout.engine === 'object' ? layout.engine : null;
+        this.layoutUnits = layout.units === 'metric' || layout.units === 'us' ? layout.units : null;
         this.themeName = this._themeName();
         this.theme = THEMES[this.themeName] || THEMES.classic;
         this.hudHoliday = this._hudHoliday();      // the HUD's holiday colours (hud_holiday.js), null for none
