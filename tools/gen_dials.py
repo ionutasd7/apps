@@ -19,7 +19,7 @@ import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'apps', 'cluster_themes', 'hud', 'layouts')
-FONT_H = {'c_speed': 112, 'c_val': 55, 'r_label': 30, 'y_gear': 222, 's_scale': 27, 'b_scale': 18, 'm_label': 21,
+FONT_H = {'small': 45, 'c_speed': 112, 'c_val': 55, 'r_label': 30, 'y_gear': 222, 's_scale': 27, 'b_scale': 18, 'm_label': 21,
           's_hero': 115, 'n_gear': 83, 'head': 27, 'b_val': 45, 'm_speed': 66, 'm_gl': 23}
 GEARBOX = (1406, 342, 1597, 419)
 GB_C = ((GEARBOX[0] + GEARBOX[2]) // 2, (GEARBOX[1] + GEARBOX[3]) // 2)      # 1501, 380
@@ -228,60 +228,59 @@ def ielec():
 
 
 def heritage():
-    """Old and new: needles and chrome, fuel and battery bars at the edges, a framed dash in the middle."""
+    """Old and new: F80 M3-style dials, smooth fuel and battery bars at the edges, a framed dash in the middle."""
     r = 250
     rcx, rcy = GB_C
     lcx = 1920 - rcx
-    common = dict(needle=True, face=True, glow=0.6)
-    sub = dict(start=240, sweep=240, band=4, needle=True, glow=0.3, bezel=False, tickScale=0.45)
-    spd = dial(lcx, rcy, r, 'speed', ['evlo', 'ev', 'ev'], ticks=32, major=4, band=8, **common)
-    wat = dial(lcx, rcy + 140, 58, 'coolant', ['ev', 'ev', 'ev'], ticks=8, major=4, min=50, max=130, red=115, **sub)
-    tach = dial(rcx, rcy, r, 'rpm', ['evlo', 'ev', 'ev'], ticks=35, major=5, band=8, max=7000, **common)
-    oil = dial(rcx, rcy + 140, 58, 'oil', ['ev', 'ev', 'ev'], ticks=10, major=5, min=50, max=150, red=130, **sub)
+    # an F80 M3's dials: flat black, no lit band, heavy white ticks, big bold numerals, orange-red needles
+    common = dict(needle=True, face=True, glow=0.0, band=0, bandW=12, tickScale=1.25)
+    sub = dict(start=240, sweep=240, band=0, bandW=4, needle=True, glow=0.0, bezel=False, tickScale=0.5)
+    spd = dial(lcx, rcy, r, 'speed', ['fg', 'fg', 'fg'], ticks=28, major=2, linear=True, max=280, **common)
+    wat = dial(lcx, rcy + 140, 58, 'coolant', ['fg', 'fg', 'fg'], ticks=8, major=4, min=50, max=130, red=115, **sub)
+    tach = dial(rcx, rcy, r, 'rpm', ['fg', 'fg', 'fg'], ticks=28, major=4, max=7000, **common)
+    oil = dial(rcx, rcy + 140, 58, 'oil', ['fg', 'fg', 'fg'], ticks=10, major=5, min=50, max=150, red=130, **sub)
     pill = [745, 592, 430, 44]
     P = (700, 128, 520, 516)            # the middle dash's frame
     w = [fill('bg', 0, 0, 1920, 660),
-         pdash([spd, wat], id_='dash_l', rect=(0, 60, 700, 600), needleColor='accent', faceColor='panel'),
-         pdash([tach, oil], id_='dash_r', rect=(1220, 60, 700, 600), needleColor='accent', faceColor='panel'),
+         pdash([spd, wat], id_='dash_l', rect=(0, 60, 700, 600), needleColor='accent', faceColor='panel', tickColor='fg'),
+         pdash([tach, oil], id_='dash_r', rect=(1220, 60, 700, 600), needleColor='accent', faceColor='panel', tickColor='fg'),
          {'id': 'frame', 'type': 'box', 'class': 'content', 'z': 1, 'x': P[0], 'y': P[1], 'w': P[2], 'h': P[3],
           'fill': 'panel', 'line': 'frame', 'border': 2, 'radius': 22, 'conn': 2},
          pdash([], id_='dash_m', rect=(pill[0] - 4, pill[1] - 4, pill[2] + 8, pill[3] + 8), pill=pill, color='panel',
                z=2, conn=2)]
-    w += labels('spd_l', spd, ['{{spd:%d}}' % i for i in range(SPEED_MARKS)], 'r_label', 'fg', inset=46)
-    w += labels('rpm_l', tach, [str(i) for i in range(8)], 'r_label', 'fg', inset=46)
+    w += labels('spd_l', spd, [str(v) for v in range(0, 281, 40)], 'small', 'fg', inset=90)
+    w += labels('rpm_l', tach, [str(i) for i in range(8)], 'small', 'fg', inset=90, red_from=7)
     # speedo: the speed in numbers; its sub-dial is the coolant
-    w += [ctext('speed', lcx, rcy - 92, 200, '{{speed}}', 'c_val'),
-          ctext('speed_u', lcx, rcy - 54, 120, '{{u:speedLc}}', 'r_label', 'dim'),
-          ctext('wat_c', lcx - 50, rcy + 178, 30, 'C', 'r_label', 'ev'),
+    w += [ctext('speed', lcx, rcy - 62, 150, '{{speed}}', 'c_val'),
+          ctext('speed_u', lcx, rcy - 22, 120, 'km/h', 'r_label', 'dim'),
+          ctext('wat_c', lcx - 50, rcy + 178, 30, 'C', 'r_label', 'dim'),
           ctext('wat_h', lcx + 50, rcy + 178, 30, 'H', 'r_label', 'hot'),
           ctext('wat_v', lcx, rcy + 212, 200, 'WATER {{coolant}}°', 'r_label', 'fg')]
     # tach: its unit, the engine on or off (BMW shows the gear in the strip on a G21, so the middle is ours); oil
     w += [ctext('rpm_x', rcx, rcy - 92, 200, '1/MIN X1000', 'r_label', 'dim', spacing=1),
           ctext('eng', rcx, rcy - 56, 240, '{{engineState}}', 'm_label', 'ev', spacing=2),
-          ctext('oil_c', rcx - 50, rcy + 178, 30, 'C', 'r_label', 'ev'),
+          ctext('oil_c', rcx - 50, rcy + 178, 30, 'C', 'r_label', 'dim'),
           ctext('oil_h', rcx + 50, rcy + 178, 30, 'H', 'r_label', 'hot'),
           ctext('oil_v', rcx, rcy + 212, 200, 'OIL {{oil}}°', 'r_label', 'fg')]
-    # the edges: fuel (left) and the hybrid battery (right) as tall bars, clear of the hood line
-    for k, x, sig, mn, mx, cols, head, tok in (('fuel', 70, 'fuel', 0, 1, ['hot', 'fg', 'fg'], 'FUEL', '{{fuelPct}}'),
-                                               ('hv', 1824, 'hvSoc', 0, 100, ['hot', 'ev', 'ev'], 'HV', '{{hvSoc}}')):
-        w += [meter(k + '_bar', x, 300, 26, 270, sig, mn, mx, cols, [0.12, 1], 18, 4, vertical=True, conn=2),
-              ctext(k + '_h', x + 13, 594, 90, head, 'm_label', 'dim', spacing=2),
-              ctext(k + '_v', x + 13, 626, 100, tok + '%', 'r_label', 'fg')]
+    # the edges: fuel (left) and the hybrid battery (right) as smooth tall bars with quarter marks
+    for k, x, sig, mn, mx, cols, head, tok in (('fuel', 66, 'fuel', 0, 1, ['hot', 'fg', 'fg'], 'FUEL', '{{fuelPct}}'),
+                                               ('hv', 1830, 'hvSoc', 0, 100, ['hot', 'ev', 'ev'], 'HV', '{{hvSoc}}')):
+        w += [meter(k + '_bar', x, 300, 22, 270, sig, mn, mx, cols, [0.12, 1], 135, 0, vertical=True, conn=3)]
+        for q in range(5):   # quarter marks as text (packed into image sheets, not a layer each)
+            w.append(text('%s_t%d' % (k, q), x - 22 if k == 'fuel' else x + 24, 285 + round(q * 268 / 4), 20, '-', 'r_label', 'dim', conn=3))
+        w += [ctext(k + '_h', x + 11, 594, 90, head, 'm_label', 'dim', spacing=2, conn=3),
+              ctext(k + '_v', x + 11, 626, 100, tok + '%', 'r_label', 'fg', conn=3)]
     # the middle dash
     cx = P[0] + P[2] // 2
     w += [ctext('date', cx, 156, 400, '{{date}}', 'r_label', 'fg', spacing=2),
           ctext('mode', cx, 190, 340, '{{mode}}', 'm_label', 'accent', spacing=3),
           ctext('gear_h', cx - 150, 256, 120, 'GEAR', 'm_label', 'dim', spacing=3),
           ctext('gear', cx, 252, 200, '{{gear}}', 'n_gear', 'fg', hotWhen='now'),
-          text('pwr_h', P[0] + 40, 306, 120, 'POWER', 'm_label', 'dim', 'left', spacing=2),
-          meter('pwr_bar', P[0] + 150, 312, 230, 8, 'powerPct', 0, 100, ['ev', 'ev', 'hot'], [0.85, 1], 23, 3, conn=2),
-          text('pwr', P[0] + 388, 298, 70, '{{power}}', 'r_label', 'fg', 'right'),
-          text('pwr_u', P[0] + 462, 298, 40, 'kW', 'r_label', 'dim', 'left'),
-          fill('rule', P[0] + 30, 344, P[2] - 60, 1, 'frame', z=2, conn=2)]
-    cols = [('TRIP', '{{trip}}', '{{u:distLc}}'), ('TIME', '{{tripTime}}', 'h'), ('AVERAGE', '{{avgSpeed}}', '{{u:speedLc}}'),
-            ('FUEL', '{{tripFuel}}', 'l/100'), ('E-RANGE', '{{eRange}}', '{{u:distLc}}'), ('BATT USED', '{{hvUsed}}', '%')]
+          fill('rule', P[0] + 30, 330, P[2] - 60, 1, 'frame', z=2, conn=2)]
+    cols = [('TRIP', '{{trip}}', 'km'), ('TIME', '{{tripTime}}', 'h'), ('AVERAGE', '{{avgSpeed}}', 'km/h'),
+            ('FUEL', '{{tripFuel}}', 'l/100'), ('E-RANGE', '{{eRange}}', 'km')]
     for i, (head, tok, unit) in enumerate(cols):
-        x = P[0] + 30 + (i % 3) * 160
+        x = P[0] + 30 + (i % 3) * 160 if i < 3 else P[0] + 110 + (i - 3) * 160
         y = 358 + (i // 3) * 112
         k = 'trip%d' % i
         w += [text(k + '_h', x, y, 160, head, 'm_label', 'ev', 'left', spacing=2),
@@ -293,12 +292,11 @@ def heritage():
         'schemaVersion': 2, 'name': 'Heritage', 'theme': 'heritage', 'units': 'metric',
         'engine': {'powerKw': 135, 'torqueNm': 300},
         '_about': 'Heritage cluster for iDrive 7 plug-in hybrids (made on a 330e G21), generated by tools/gen_dials.py (edit '
-                  'that and regenerate): old and new, always in km/h, km and C ("units": "metric"). Chrome-ringed speedo '
-                  'and tach with dark faces, white numerals and orange needles over a thin BMW i blue band; coolant in '
+                  'that and regenerate): old and new, always in km/h, km and C ("units": "metric"). F80 M3-style dials: '
+                  'flat black faces, heavy white ticks, big bold numerals, orange-red needles, a linear 0-280 speedo; coolant in '
                   'the speedo\'s sub-dial, oil in the tach\'s, ENGINE ON / OFF in the tach. Fuel (left edge) and the hybrid '
-                  'battery (right edge) as tall bars. A framed dash in the middle: date, drive mode, the gear, engine '
-                  'power, a trip computer (distance, time, average speed, fuel per 100 km, estimated electric range, '
-                  'battery used) and a status pill: green ALL SYSTEMS OK, amber or red with the reason. Clock, range and '
+                  'battery (right edge) as smooth tall bars. A framed dash in the middle: date, drive mode, the gear, engine '
+                  'a trip computer (distance, time, average speed, fuel per 100 km, estimated electric range) and a status pill: green ALL SYSTEMS OK, amber or red with the reason. Clock, range and '
                   'outside temperature along the bottom. Widget reference: shared/hud.js.',
         'widgets': w + strip(),
     }

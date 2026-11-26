@@ -1589,6 +1589,8 @@ class HudApp {
     _pdashFrac(d) {
         const v = this._raw(d.signal);
         if (!isNum(v)) return 0;
+        // a "linear" speed dial runs evenly to its "max" in km/h (Heritage: 0..280, like an F80 M3's), else BMW's uneven scale
+        if (d.signal === 'speed' && d.linear) { const us = this.setting('units') === 'us'; return Math.min(1, Math.max(0, (us ? v * 0.621371 : v) / (d.max || 280))); }
         if (d.signal === 'speed') { const us = this.setting('units') === 'us'; return scaleFrac(us ? v * 0.621371 : v, SPEED_SCALE[us ? 'us' : 'metric']); }
         const mn = isNum(d.min) ? d.min : 0, mx = isNum(d.max) ? d.max : 100;
         return Math.min(1, Math.max(0, (v - mn) / (mx - mn)));
@@ -2452,7 +2454,7 @@ class HudApp {
             c.uniform(ref, 'u_size', [w.w, w.h]);
             c.uniform(ref, 'u_bg', rgba(color(t, w.color || 'bg')));
             c.uniform(ref, 'u_n', [ds.length]);
-            c.uniform(ref, 'u_dial', v4((d) => [d.cx - w.x, d.cy - w.y, d.r, d.band || 26]), { type: 'vec4' });
+            c.uniform(ref, 'u_dial', v4((d) => [d.cx - w.x, d.cy - w.y, d.r, isNum(d.bandW) ? d.bandW : d.band || 26]), { type: 'vec4' });
             c.uniform(ref, 'u_ang', v4((d) => [d.start * Math.PI / 180, d.sweep * Math.PI / 180, d.ticks || 40, d.major || 5]), { type: 'vec4' });
             c.uniform(ref, 'u_val', v4((d) => [0, this._pdashRed(d), isNum(d.glow) ? d.glow : 0.8, d.bezel === false ? 0 : 1]), { type: 'vec4' });
             // the colour table: every role the dials name (at most 6), each dial's gradient as three indices into it

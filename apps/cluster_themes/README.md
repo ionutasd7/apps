@@ -139,10 +139,10 @@ M Competition and i Electric show engine power against a B48's 135 kW (the 330e'
 
 ### Heritage
 
-Old and new together, for a plug-in hybrid, always in km/h, km and °C whatever the Units setting says. Chrome-ringed speedo and tach with dark faces, white numerals and orange needles over a thin BMW i blue band; the coolant in the speedo's small dial, the oil in the tach's, and ENGINE ON / OFF in the tach. Fuel runs up a tall bar on the left edge and the hybrid battery on the right. In the middle a framed dash:
+Old and new together, for a plug-in hybrid, always in km/h, km and °C whatever the Units setting says. Dials in the style of an F80 M3: flat black faces with chrome rings, heavy white ticks, big bold numerals, orange-red needles, a linear 0-280 km/h speedo and a red zone on the tach from your Redline setting; the coolant in the speedo's small dial, the oil in the tach's, and ENGINE ON / OFF in the tach. Fuel runs up a smooth tall bar on the left edge and the hybrid battery on the right, with quarter marks. In the middle a framed dash:
 
-- the date, the drive mode, the gear (red at the shift point) and the engine's power;
-- a trip computer for this drive: distance, time, average speed, fuel per 100 km, an estimated electric range and the hybrid battery used;
+- the date, the drive mode and the gear (red at the shift point);
+- a trip computer for this drive: distance, time, average speed, fuel per 100 km and an estimated electric range;
 - a status pill: green **ALL SYSTEMS OK**, amber (fuel low, engine warming up) or red (oil or coolant over your warning limits, a tyre under 1.9 bar) with the reason.
 
 Clock, range and outside temperature run along the bottom as in the other themes.
