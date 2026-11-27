@@ -1758,13 +1758,13 @@ void main() {
 `;
 
 
-const PDASH = `// pdash: up to two round gauges in ONE cluster-render "effect" layer (GLSL ES 1.00): the M Performance, M Competition,
+const PDASH = `// pdash: up to three round gauges in ONE cluster-render "effect" layer (GLSL ES 1.00): the M Performance, M Competition,
 // i Electric and Heritage themes' (tools/gen_dials.py). Over the background u_bg each dial draws: an optional dial face
 // (u_faceC, a soft radial), a tinted well, a lit band filled from the start to u_val.x along a three-stop gradient
 // (u_ca at 0, u_cb at 0.55, u_cc at 1 of the sweep) with a glow, the unlit band u_trackC, tick marks (every u_ang.w-th
 // one long), a thin red arc past u_val.y outside the band, a chrome bezel, and an optional needle (u_needleC, tapered,
 // with a cap). Optional: the slanted M stripe (u_stripe) and a status pill (u_pill, outlined in u_pillC.rgb while
-// u_pillC.a > 0). Array uniforms (vec4, 2 elements):
+// u_pillC.a > 0). Array uniforms (vec4, 3 elements):
 //   u_dial[i]  cx, cy (layer px, y down), outer r, band width
 //   u_ang[i]   start, sweep (radians clockwise from 12 o'clock), ticks, long tick every n
 //   u_val[i]   value 0..1, red zone from 0..1 (over 1: none), glow 0..1, bezel 0 / 1
@@ -1777,10 +1777,10 @@ varying vec2 v_uv;
 uniform vec2 u_size;
 uniform vec4 u_bg;
 uniform float u_n;
-uniform vec4 u_dial[2];
-uniform vec4 u_ang[2];
-uniform vec4 u_val[2];
-uniform vec4 u_sty[2];
+uniform vec4 u_dial[3];
+uniform vec4 u_ang[3];
+uniform vec4 u_val[3];
+uniform vec4 u_sty[3];
 uniform vec4 u_pal[4];
 uniform vec4 u_trackC;
 uniform vec4 u_tickC;
@@ -1809,7 +1809,7 @@ vec3 grad(vec3 a, vec3 b, vec3 c, float f) {
 void main() {
     vec2 p = v_uv * u_size;
     vec3 col = u_bg.rgb;
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 3; i++) {
         if (float(i) >= u_n) break;
         vec4 D = u_dial[i];
         vec2 d = p - D.xy;
@@ -1874,7 +1874,7 @@ void main() {
         }
     }
     // the needles, over every dial (a sub-dial drawn after a big one never hides its needle)
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 3; i++) {
         if (float(i) >= u_n) break;
         vec4 D = u_dial[i];
         if (mod(u_sty[i].x, 2.0) < 0.5) continue;

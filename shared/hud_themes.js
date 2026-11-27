@@ -210,6 +210,19 @@ const THEMES = {
         ev: [47, 140, 255, 255], evlo: [26, 79, 208, 255], teal: [0, 196, 170, 255],
         ok: [53, 208, 127, 255], warning: [255, 176, 32, 255], frame: [70, 82, 100, 255], needle: [255, 46, 24, 255],
     },
+    // Heritage at night (hud.js uses "<theme>_night" after sunset with "Night colours" on Auto): an F80 M3's night look,
+    // the white markings in amber-orange, the needles a deeper red, the chrome and the faces darker.
+    heritage_night: {
+        name: 'Heritage',
+        fg: [255, 150, 64, 255], dim: [176, 104, 44, 255], track: [40, 26, 14, 255], arc: [40, 110, 220, 255],
+        glow: 0, stripe: false,
+        bar: { low: [40, 110, 220], mid: [40, 110, 220], high: [255, 42, 42], midAt: 'shift' },
+        rev: { from: [40, 110, 220], to: [40, 110, 220] },
+        bg: [0, 0, 0, 255], panel: [14, 11, 9, 255], line: [128, 112, 96, 255], head: [255, 84, 24, 255],
+        ink: [12, 12, 14, 255], accent: [255, 110, 40, 255], well: [0, 0, 0, 255],
+        ev: [40, 110, 220, 255], evlo: [20, 60, 160, 255], teal: [0, 150, 130, 255],
+        ok: [40, 170, 100, 255], warning: [230, 150, 30, 255], frame: [70, 50, 34, 255], needle: [214, 26, 14, 255],
+    },
     // Ribbon (layout ribbon.json, Nov 13 2026): calm and premium. One ribbon of light under the hood line fills with the
     // revs (cool white, warming to amber, red at the top), a huge thin speed, thin side columns. Extra roles: gear (the
     // gear number), ribbon (the line's gradient), greeting (the {{holiday}} text). holidays: true = the holiday

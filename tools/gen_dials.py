@@ -238,44 +238,58 @@ def heritage():
     tach = dial(tcx, cy, r, 'rpm', ['fg', 'fg', 'fg'], ticks=35, major=5, max=7000, redW=16, **big)
     fuel = dial(255, 420, 100, 'fuel', ['fg', 'fg', 'fg'], ticks=8, major=4, min=0, max=1, **small)
     oil = dial(1665, 420, 100, 'oil', ['fg', 'fg', 'fg'], ticks=10, major=5, min=70, max=170, red=150, **small)
-    pill = [scx - 125, 440, 250, 40]
+    face = dict(start=240, sweep=240, band=0, bandW=4, needle=True, face=False, glow=0.0, bezel=False, tickScale=0.45)
+    # in the dials' lower faces: the hybrid battery's power (charge left of 0, power right) and an econometer
+    pwr = dial(scx, 452, 64, 'hvKw', ['fg', 'fg', 'fg'], ticks=12, major=4, min=-40, max=80, **face)
+    eco = dial(tcx, 452, 64, 'l100', ['fg', 'fg', 'fg'], ticks=10, major=5, min=0, max=20, red=15, **face)
+    pill = [870, 64, 180, 34]                      # the status pill: in the gap over the two dials
     w = [fill('bg', 0, 0, 1920, 660),
-         pdash([fuel, spd], id_='dash_l', rect=(0, 40, 960, 620), needleColor='needle', faceColor='panel', tickColor='fg',
-               pill=pill),
-         pdash([tach, oil], id_='dash_r', rect=(960, 40, 960, 620), needleColor='needle', faceColor='panel', tickColor='fg',
-               stripe=[tcx - 36, 432, 72, 12])]
+         pdash([fuel, spd, pwr], id_='dash_l', rect=(0, 40, 960, 620), needleColor='needle', faceColor='panel', tickColor='fg'),
+         pdash([tach, oil, eco], id_='dash_r', rect=(960, 40, 960, 620), needleColor='needle', faceColor='panel', tickColor='fg',
+               stripe=[tcx - 36, 196, 72, 12]),
+         pdash([], id_='dash_m', rect=(pill[0] - 4, pill[1] - 4, pill[2] + 8, pill[3] + 8), pill=pill, z=2, conn=2)]
     # the scales: numerals inside the ticks
     w += labels('spd_l', spd, [str(v) for v in range(0, 281, 20)], 'scale', 'fg', inset=60)
     w += labels('rpm_l', tach, [str(i) for i in range(8)], 'b_val', 'fg', inset=66)
     w += [ctext('spd_u', scx, cy - 95, 120, 'km/h', 'b_unit', 'fg'),
           ctext('rpm_u', tcx, cy - 95, 200, '1/min x 1000', 'r_label', 'fg'),
-          ctext('eng', tcx, 470, 200, '{{engineState}}', 'm_label', 'dim', spacing=1)]
+          ctext('eng', tcx, cy - 60, 200, '{{engineState}}', 'm_label', 'dim', spacing=1)]
+    # the lower faces' small gauges: their ends and readings
+    for k, d, ends, val in (('pwr', pwr, ('CHG', 'PWR'), '{{hvKw}} kW'), ('eco', eco, ('0', '20'), '{{l100}} l/100')):
+        for j, t in enumerate(ends):          # the two ends, just outside the dial's open bottom
+            w.append(ctext('%s_l%d' % (k, j), d['cx'] + (-1 if j == 0 else 1) * 70, d['cy'] + 44, 60, t, 'm_label', 'dim'))
+        w.append(ctext(k + '_v', d['cx'], d['cy'] + 66, 160, val, 'r_label', 'fg'))
     # the small gauges: fuel 0 1/2 1 (and the pump's side), oil 70 120 170 C
     for k, d, ends in (('fuel', fuel, ('0', '1/2', '1')), ('oil', oil, ('70', '120', '170'))):
         R = d['r'] - 40
         for j, t in enumerate(ends):
             a = math.radians(d['start'] + d['sweep'] * j / 2)
             w.append(ctext('%s_l%d' % (k, j), d['cx'] + R * math.sin(a), d['cy'] - R * math.cos(a), 70, t, 'r_label', 'fg'))
-    w += [ctext('fuel_v', 255, 478, 120, '{{fuelPct}} %', 'r_label', 'dim'),
-          ctext('oil_u', 1665, 478, 140, 'OIL {{oil}}°', 'r_label', 'dim')]
+    w += [{'id': 'fuel_icon', 'type': 'icon', 'icon': 'fuel', 'z': 5, 'x': 237, 'y': 444, 'w': 22, 'h': 26, 'color': 'dim',
+           'conn': 3},
+          text('fuel_side', 262, 446, 20, '>', 'head', 'dim', 'left', conn=3),
+          ctext('fuel_v', 255, 492, 120, '{{fuelPct}} %', 'r_label', 'dim'),
+          ctext('oil_u', 1665, 492, 140, 'OIL {{oil}}°', 'r_label', 'dim')]
     # between the dials, at the bottom: the speed and the gear
     w += [text('speed', 880, 476, 106, '{{speed}}', 'c_val', 'fg', 'right', conn=2),
           text('speed_u', 990, 497, 60, 'km/h', 'r_label', 'dim', 'left', conn=2),
           ctext('gear', 960, 588, 160, '{{gearnum}}', 'n_gear', 'fg', hotWhen='now', conn=2),
           ctext('mode', 960, 642, 220, '{{mode}}', 'm_label', 'accent', spacing=2, conn=2)]
     # the status pill in the speedo's lower face
-    w += [text('status_ok', pill[0], pill[1] + 5, pill[2], 'ALL SYSTEMS OK', 'r_label', 'ok', spacing=2, showWhen='ok', conn=2),
-          text('status_warn', pill[0], pill[1] + 5, pill[2], '{{status}}', 'r_label', 'fg', spacing=1, showWhen='!ok', conn=2)]
+    w += [text('status_ok', pill[0], pill[1] + 7, pill[2], 'ALL OK', 'm_label', 'ok', spacing=3, showWhen='ok', conn=2),
+          text('status_warn', pill[0], pill[1] + 7, pill[2], '{{status}}', 'm_label', 'fg', spacing=1, showWhen='!ok', conn=2)]
     # under the small gauges: the trip computer (left), the date, battery and water (right)
     def cell(k, x, y, head, tok, unit, color='fg'):
         return [text(k + '_h', x, y, 160, head, 'm_label', 'dim', 'left', spacing=1, conn=3),
                 text(k, x, y + 22, 180, tok + ' ' + unit if unit else tok, 'r_label', color, 'left', conn=3)]
-    for i, (head, tok, unit) in enumerate([('TRIP', '{{trip}}', 'km'), ('TIME', '{{tripTime}}', 'h'),
-                                           ('AVERAGE', '{{avgSpeed}}', 'km/h'), ('FUEL', '{{tripFuel}}', 'l/100')]):
-        w += cell('trip%d' % i, 60 + (i % 2) * 190, 552 + (i // 2) * 52, head, tok, unit)
-    for i, (head, tok, unit, col) in enumerate([('HV', '{{hvSoc}}', '%', 'ev'), ('E-RANGE', '{{eRange}}', 'km', 'ev'),
-                                                ('WATER', '{{coolant}}°', '', 'fg'), ('DATE', '{{date}}', '', 'fg')]):
-        w += cell('info%d' % i, 1490 + (i % 2) * 190, 552 + (i // 2) * 52, head, tok, unit, col)
+    for side, x0, cells in (('trip', 50, [('TRIP', '{{trip}}', 'km', 'fg'), ('TIME', '{{tripTime}}', 'h', 'fg'),
+                                          ('AVERAGE', '{{avgSpeed}}', 'km/h', 'fg'), ('FUEL', '{{tripFuel}}', 'l/100', 'fg')]),
+                            ('info', 1490, [('HV', '{{hvSoc}}', '%', 'ev'), ('E-RANGE', '{{eRange}}', 'km', 'ev'),
+                                            ('WATER', '{{coolant}}°', '', 'fg'), ('DATE', '{{date}}', '', 'fg')])):
+        for i, (head, tok, unit, col) in enumerate(cells):
+            w += cell('%s%d' % (side, i), x0 + 10 + (i % 2) * 200, 552 + (i // 2) * 52, head, tok, unit, col)
+        w += [fill(side + '_vr', x0 + 196, 556, 1, 92, 'frame', z=2),
+              fill(side + '_hr', x0, 601, 390, 1, 'frame', z=2)]
     return {
         'schemaVersion': 2, 'name': 'Heritage', 'theme': 'heritage', 'units': 'metric', 'packWaste': 3,
         'engine': {'powerKw': 135, 'torqueNm': 300},

@@ -139,13 +139,21 @@ M Competition and i Electric show engine power against a B48's 135 kW (the 330e'
 
 ### Heritage
 
-An F80 M3's cluster (2015), for a plug-in hybrid, always in km/h, km and °C whatever the Units setting says. Two big dials side by side with chrome rings open at the bottom, dark grey faces, white ticks and numerals and thin red needles on dark hubs: the speed (0-280, even steps) and the revs (0-7, a red block from your Redline setting, the M stripe and ENGINE ON / OFF in its face). Small round fuel (0, 1/2, 1) and oil (70, 120, 170 °C) gauges sit outboard. Between the dials at the bottom: the speed in numbers, the gear (red at the shift point) and the drive mode.
+An F80 M3's cluster (2015), for a plug-in hybrid, always in km/h, km and °C whatever the Units setting says. Two big dials side by side with chrome rings open at the bottom, dark grey faces, white ticks and numerals and thin red needles on dark hubs: the speed (0-280, even steps) and the revs (0-7, a red block from your Redline setting that blinks at the shift point, the M stripe and ENGINE ON / OFF in its face). Small round fuel (0, 1/2, 1, the pump and the filler's side) and oil (70, 120, 170 °C) gauges sit outboard. Between the dials at the bottom: the speed in numbers, the gear (red at the shift point) and the drive mode.
 
-Added for the hybrid: a status pill in the speedo's face (green **ALL SYSTEMS OK**, amber for fuel low or engine warming up, red for oil or coolant over your warning limits or a tyre under 1.9 bar), a trip computer under the fuel gauge (distance, time, average speed, fuel per 100 km) and, under the oil gauge, the hybrid battery, an estimated electric range, the coolant and the date. Clock, range and outside temperature run along the bottom as in the other themes.
+In the dials' lower faces, two small needles: the hybrid battery's power in the speedo (CHG left of 0 while it charges, PWR right while it drives the car, kW under it) and an econometer in the tach (l/100 km now, 0 to 20). Over the dials a status pill: green **ALL OK**, amber (fuel low, warming up) or red (oil or coolant over your warning limits, a tyre under 1.9 bar) with the reason. Under the fuel gauge the trip computer (distance, time, average speed, fuel per 100 km), under the oil gauge the hybrid battery, an estimated electric range, the coolant and the date. Clock, range and outside temperature along the bottom.
 
-What the numbers are: fuel per 100 km comes from the tank's litres since the start of the drive, so it shows only after 5 km and once a litre is used (a fill-up starts it again). The electric range is an estimate: battery charge x 45 km (the setting `evRangeFull`, not on the center-screen page yet), not BMW's own figure. The status pill only knows what the app reads; BMW's own check-control messages are not on any signal the app has, so ALL SYSTEMS OK means these readings are fine, not that the car has no fault.
+**At night** (Settings, Night colours on Auto) Heritage switches to an M3's night look: amber-orange markings, deeper red needles, darker chrome.
+
+What the numbers are:
+
+- **Battery power** is the pack's voltage times its current from the battery unit, the reads cauliflowermossgrape's eDrive app uses (MIT). Not checked on a car by us yet.
+- **Fuel now and per 100 km** come from the engine's power (torque x revs) and a B48's typical efficiency, so the econometer moves live; the trip figure is then scaled to the tank's own drop once 3 litres are gone. Treat the econometer as a guide, not a fuel meter.
+- **Electric range** is an estimate: battery charge x **Electric range on a full battery** (Settings, 45 km by default), not BMW's own figure.
+- **ALL OK** only knows what the app reads; BMW's own check-control messages are not on any signal the app has.
 
 <p align="center"><img src="../../docs/images/cluster-heritage.png" width="900" alt="Heritage theme"></p>
+<p align="center"><img src="../../docs/images/cluster-heritage-night.png" width="900" alt="Heritage theme at night"></p>
 
 Minimal, Track, Drag, Rally, Retro 80s, Cruise, Dyno, Ribbon, M Performance, M Competition, i Electric and Heritage have no map window yet; with "Show Waze map inside the theme" on, Waze stays in its usual place while they show.
 

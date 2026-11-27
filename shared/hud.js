@@ -364,7 +364,7 @@ function mediaText(v) {
 /** Seconds as m:ss. */
 function clockOf(sec) { const t = Math.max(0, Math.floor(sec)); return Math.floor(t / 60) + ':' + ('0' + (t % 60)).slice(-2); }   // its speed scale: 0..200 mph by 20, 0..330 km/h by 30 (linear)
 const ROAD_DASH_M = 12;            // the Sport road: metres per dash and gap (shaders.js sdash u_road)
-const PDASH_N = 2;                 // shaders.js pdash: dials per layer (more dials: more pdash widgets)
+const PDASH_N = 3;                 // shaders.js pdash: dials per layer (more dials: more pdash widgets)
 const CUE_TYPES = { lights: true, shiftbar: true, revbar: true, revarc: true, ribbon: true, mtach: true, pdash: true };
 // the shift-light test (page.js Alerts): rpm climbs from TEST_FROM to just past the shift point, then holds
 const TEST_FROM = 1500, TEST_CLIMB_MS = 2500, TEST_HOLD_MS = 1200;
@@ -391,6 +391,21 @@ const HV_SOC = { ecu: 0x07, did: 'DDBC', bytes: 2, at: 0, factor: 0.1, offset: 0
 const FUEL_OBD = { obd: '2F', bytes: 1, at: 0, factor: 100 / 255, offset: 0, min: 0, max: 100, timeoutMs: 1000 };
 const FUEL_EVERY_MS = 10000, FUEL_RETRY_MS = 300000, FUEL_STALE_MS = 60000;
 const HV_EVERY_MS = 5000, HV_RETRY_MS = 60000, HV_STALE_MS = 20000;
+// A plug-in hybrid's battery power: pack voltage x current from the battery unit (SME 0x07), the reads and sign of
+// cauliflowermossgrape's eDrive / Redline 2.0 (idrive7-apps, MIT; apps/redline/electrical.js): kW = V x A / 1000 x -1, + while
+// the battery drives the car, - while it charges (regen). The first voltage that answers is kept. Not checked on our car.
+const HV_V = [
+    { ecu: 0x07, did: 'DDB4', bytes: 2, factor: 0.01, min: 150, max: 500, timeoutMs: 600 },
+    { ecu: 0x07, did: 'DD68', bytes: 2, factor: 0.01, min: 150, max: 500, timeoutMs: 800 },
+    { ecu: 0x07, did: 'DD66', bytes: 2, factor: 0.01, min: 150, max: 500, timeoutMs: 800 },
+    { ecu: 0x07, did: 'DDEF', bytes: 2, factor: 1, min: 150, max: 500, timeoutMs: 800 },
+    { ecu: 0x07, did: 'E54D', bytes: 2, factor: 0.01, min: 150, max: 500, timeoutMs: 600 },
+];
+const HV_A = { ecu: 0x07, did: 'DD69', bytes: 4, factor: 0.01, signed: true, min: -800, max: 800, timeoutMs: 600 };
+const HV_KW_MS = 500, HV_KW_STALE_MS = 3000, HV_V_EVERY_MS = 10000;
+// fuel flow from the engine's power (Heritage's econometer and trip l/100): L/h = idle + kW x BSFC / petrol density,
+// a B48's typical brake specific consumption; scaled by the tank's own drop once a few litres are gone this drive
+const FUEL_IDLE_LH = 0.6, FUEL_BSFC = 255, FUEL_DENSITY = 745;
 // BMW's speed scale: even steps to 120 mph (180 km/h), then wider ones to 200 mph (320 km/h)
 const SPEED_SCALE = { us: [0, 20, 40, 60, 80, 100, 120, 160, 200], metric: [0, 30, 60, 90, 120, 150, 180, 250, 320] };
 /** speed (display unit) -> 0..1 along a scale of evenly spaced labels */
@@ -539,6 +554,8 @@ class HudApp {
         this.intakeDme = null; this.intakeDmeAt = 0;  // C, intake air from the engine unit (config.dme.intake)
         this.needsIntake = false;        // a shown widget uses the intake temperature
         this.hvSoc = null; this.hvSocAt = 0;  // %, a plug-in hybrid's battery charge (HV_SOC)
+        this.hvKw = null; this.hvKwAt = 0; this.hvVolt = null; this.hvVoltAt = 0;   // battery power (HV_V x HV_A)
+        this.fuelModelL = 0; this.fuelFlowLh = null; this.l100 = null;   // fuel used this drive (model), flow now, l/100 km now
         this.needsHv = false;            // a shown widget uses it
         this.fuelObd = null; this.fuelObdAt = 0;  // %, the fuel level from the engine unit (FUEL_OBD)
         this.needsFuel = false;          // a shown widget uses the fuel level
@@ -655,7 +672,8 @@ class HudApp {
         const j = JSON.stringify(shown) + ' ' + ids.join(' ');
         this.needsBoost = /boost/.test(j);
         this.needsIntake = /intake/.test(j);
-        this.needsHv = /hvSoc/.test(j);
+        this.needsHv = /hvSoc|eRange|hvUsed/.test(j);
+        this.needsHvKw = /hvKw/.test(j);
         this.needsFuel = /fuel/i.test(j);
     }
     /** A sensor's value now, as its slot shows it ('--' without one). */
@@ -1045,6 +1063,7 @@ class HudApp {
         const hasBoost = !!(dme && Array.isArray(dme.boost) && dme.boost.length);
         const hasIntake = !!(dme && Array.isArray(dme.intake) && dme.intake.length);
         let rd = null, busy = false, baro = 101.3, baroAt = 0, intakeAsk = 0, hvAsk = 0, hvMiss = 0, fuelAsk = 0, fuelMiss = 0;
+        let kwAsk = 0, kwMiss = 0, voltI = 0, voltOk = -1;
         try {
             // the kit's read-only link: anything but a read (22 / OBD 01) is refused before it leaves the head unit.
             // silentAfter Infinity: never skip a unit that stopped answering; the retry timers below pace that.
@@ -1060,7 +1079,8 @@ class HudApp {
             const wantIntake = hasIntake && this.needsIntake && now - intakeAsk >= 2000;   // a temperature: every 2 s is plenty
             const wantHv = this.needsHv && now - hvAsk >= (hvMiss >= 3 ? HV_RETRY_MS : HV_EVERY_MS);
             const wantFuel = this.needsFuel && now - fuelAsk >= (fuelMiss >= 3 ? FUEL_RETRY_MS : FUEL_EVERY_MS);
-            if (busy || this.car.data().demo || (!wantBoost && !wantIntake && !wantHv && !wantFuel)) return;
+            const wantKw = this.needsHvKw && now - kwAsk >= (kwMiss >= 10 ? HV_RETRY_MS : HV_KW_MS);
+            if (busy || this.car.data().demo || (!wantBoost && !wantIntake && !wantHv && !wantFuel && !wantKw)) return;
             busy = true;
             (async () => {
                 if (wantFuel) {
@@ -1082,6 +1102,24 @@ class HudApp {
                     } else if (++hvMiss === 3) {
                         this.log.info('hybrid battery: no answer from the battery unit (' + ((rd.raws[rd.key(HV_SOC)] || {}).why || '?') + '); asked once a minute');
                     }
+                }
+                if (wantKw) {
+                    kwAsk = now;
+                    // the pack voltage: the one that answered, every HV_V_EVERY_MS; else the next candidate in turn
+                    if (now - this.hvVoltAt >= HV_V_EVERY_MS || !isNum(this.hvVolt)) {
+                        const i = voltOk >= 0 ? voltOk : voltI++ % HV_V.length;
+                        let v = await rd.read(HV_V[i]);
+                        if (isNum(v) && HV_V[i].did === 'DDEF' && v > 1500) v /= 10;
+                        if (isNum(v)) {
+                            if (voltOk !== i) this.log.info('hybrid battery: ' + v.toFixed(0) + ' V from the battery unit (' + HV_V[i].did + ')');
+                            voltOk = i; this.hvVolt = v; this.hvVoltAt = Date.now();
+                        } else if (voltOk === i) voltOk = -1;
+                    }
+                    const a = isNum(this.hvVolt) ? await rd.read(HV_A) : null;
+                    if (isNum(a)) {
+                        if (kwMiss >= 10 || !isNum(this.hvKw)) this.log.info('hybrid battery power: ' + (this.hvVolt * a / -1000).toFixed(1) + ' kW (DD69 x the pack voltage)');
+                        this.hvKw = this.hvVolt * a / -1000; this.hvKwAt = Date.now(); kwMiss = 0;
+                    } else if (++kwMiss === 10) this.log.info('hybrid battery power: no answer (' + ((rd.raws[rd.key(HV_A)] || {}).why || 'no pack voltage') + '); asked once a minute');
                 }
                 if (wantIntake) {
                     intakeAsk = now;
@@ -1557,15 +1595,18 @@ class HudApp {
      */
     _tripData() {
         const d = this.car.data();
-        if (d.demo) return { km: 23.4, min: 34, l100: 4.8, hvUsed: 18 };
+        if (d.demo) return { km: 23.4, min: 34, l100: 4.8, hvUsed: 18 };   // the demo drive's own figures
         const now = Date.now(), fuel = this.fuelL, soc = this._raw('hvSoc');
         if (!this.tripStart) this.tripStart = now;
-        if (isNum(fuel) && (!isNum(this.tripFuel0) || fuel > this.tripFuel0 + 2)) { this.tripFuel0 = fuel; this.tripFuelKm0 = this.tripKm; }
+        if (isNum(fuel) && (!isNum(this.tripFuel0) || fuel > this.tripFuel0 + 2)) { this.tripFuel0 = fuel; this.tripFuelKm0 = this.tripKm; this.tripModel0 = this.fuelModelL; }
         if (isNum(soc) && !isNum(this.tripSoc0)) this.tripSoc0 = soc;
-        const used = isNum(fuel) && isNum(this.tripFuel0) ? this.tripFuel0 - fuel : null, km = this.tripKm - (this.tripFuelKm0 || 0);
+        const tank = isNum(fuel) && isNum(this.tripFuel0) ? this.tripFuel0 - fuel : null;
+        const model = this.fuelModelL - (this.tripModel0 || 0), km = this.tripKm - (this.tripFuelKm0 || 0);
+        // the model, scaled by the tank's own drop once 3 L or more are gone (whole litres: too coarse before that)
+        const scale = isNum(tank) && tank >= 3 && model >= 1 ? Math.min(1.6, Math.max(0.6, tank / model)) : 1;
         return {
             km: this.tripKm, min: (now - this.tripStart) / 60000,
-            l100: isNum(used) && used >= 1 && km >= 5 ? used / km * 100 : null,
+            l100: km >= 1 ? model * scale / km * 100 : null,
             hvUsed: isNum(soc) && isNum(this.tripSoc0) ? Math.max(0, this.tripSoc0 - soc) : null,
         };
     }
@@ -1577,13 +1618,13 @@ class HudApp {
     _health() {
         const oil = this._raw('oil'), cool = this._raw('coolant'), fuel = this._raw('fuel'), rpm = this._raw('rpm');
         const wo = this.setting('warnOil') || 130, wc = this.setting('warnCoolant') || 115;
-        if (isNum(oil) && oil > wo) return { level: 2, msg: 'OIL TEMPERATURE HIGH' };
-        if (isNum(cool) && cool > wc) return { level: 2, msg: 'COOLANT TEMPERATURE HIGH' };
+        if (isNum(oil) && oil > wo) return { level: 2, msg: 'OIL HOT' };
+        if (isNum(cool) && cool > wc) return { level: 2, msg: 'COOLANT HOT' };
         const low = TYRE_CORNERS.filter((k) => isNum(this.tyres.p[k]) && this.tyres.p[k] < 1.9);
-        if (low.length) return { level: 2, msg: 'TYRE PRESSURE LOW ' + low.join(' ') };
+        if (low.length) return { level: 2, msg: 'TYRE LOW ' + low.join(' ') };
         if (isNum(fuel) && fuel < 0.1) return { level: 1, msg: 'FUEL LOW' };
-        if (isNum(oil) && oil < 60 && isNum(rpm) && rpm > 300) return { level: 1, msg: 'ENGINE WARMING UP' };
-        return { level: 0, msg: 'ALL SYSTEMS OK' };
+        if (isNum(oil) && oil < 60 && isNum(rpm) && rpm > 300) return { level: 1, msg: 'WARMING UP' };
+        return { level: 0, msg: 'ALL OK' };
     }
     /** pdash: a dial's value 0..1. speed runs along SPEED_SCALE (BMW's own uneven speedo), rpm to "max" (7000). */
     _pdashFrac(d) {
@@ -1780,6 +1821,8 @@ class HudApp {
             if (name === 'range') return isNum(this.rangeKm) ? this.rangeKm : demo ? 368 : null;
             return isNum(this.ambient) ? this.ambient : demo ? 24 : null;
         }
+        if (name === 'hvKw') return isNum(this.hvKw) && Date.now() - this.hvKwAt < HV_KW_STALE_MS ? this.hvKw : this.car.data().demo ? 14 : null;
+        if (name === 'l100') return this.car.data().demo ? 6.4 : this.l100;
         if (name === 'eRange') {     // km on the battery alone, estimated: charge x the setting "evRangeFull" (km at 100 %)
             const soc = this._raw('hvSoc');
             return isNum(soc) ? soc / 100 * (this.ctx.settings.item('evRangeFull') ? this.setting('evRangeFull') : 45) : null;
@@ -1898,6 +1941,8 @@ class HudApp {
             case 'hvUsed': { const v = this._tripData().hvUsed; return isNum(v) ? String(Math.round(v)) : '--'; }
             case 'eRange': { const v = this._raw('eRange'); return isNum(v) ? String(Math.round(us ? v * 0.621371 : v)) : '--'; }
             case 'status': return this._health().msg;
+            case 'hvKw': { const v = this._raw('hvKw'); return isNum(v) ? String(Math.round(v)) : '--'; }
+            case 'l100': { const v = this._raw('l100'); return isNum(v) ? (v >= 30 ? '30' : v.toFixed(1)) : '--'; }
             // a plug-in hybrid's combustion engine running or not (ENGINE ON / ENGINE OFF): rpm under 300 counts as off
             case 'engineState': { const v = this._raw('rpm'); return isNum(v) ? (v < 300 ? 'ENGINE OFF' : 'ENGINE ON') : '--'; }
             case 'fuelPct': { const v = this._raw('fuel'); return isNum(v) ? String(Math.round(v * 100)) : '--'; }
@@ -2044,7 +2089,7 @@ class HudApp {
         this.mapShown = this.setting('mapUp');
         if (name === 'off') {
             this._wazeWant();
-            this.problem = null; this.layoutTheme = null; this.layoutEngine = null; this.layoutUnits = null; this.needsBoost = false; this.needsIntake = false; this.needsHv = false; this.needsFuel = false;
+            this.problem = null; this.layoutTheme = null; this.layoutEngine = null; this.layoutUnits = null; this.needsBoost = false; this.needsIntake = false; this.needsHv = false; this.needsHvKw = false; this.needsFuel = false;
             this.log.info('off: nothing drawn, BMW\'s own ' + (this.target === 'panel' ? 'cluster' : 'HUD') + ' shows');
             return;
         }
@@ -2071,7 +2116,7 @@ class HudApp {
         this.hudHoliday = this._hudHoliday();      // the HUD's holiday colours (hud_holiday.js), null for none
         if (this.hudHoliday) this.theme = hudHoliday.theme(this.theme, this.hudHoliday);
         this.nightOn = this._nightDim();
-        if (this.nightOn) this.theme = dimTheme(this.theme, NIGHT_DIM);
+        if (this.nightOn) this.theme = THEMES[this.themeName + '_night'] || dimTheme(this.theme, NIGHT_DIM);   // a theme's own night look (Heritage), else dimmed
         this.log.info('layout "' + layout.name + '", theme ' + this.theme.name + (this.layoutTheme ? '' : ' (' + this.setting('hudTheme') + ')'));
         // full screen (Nov 14 2026): the layout's strip widgets (design/genlib.py full_screen) cover BMW's strip except a
         // window over its gear letter, and the theme's own strip row ("stripRow" l / r) shows the clock, range and outside
@@ -2759,9 +2804,23 @@ class HudApp {
     _trip(now) {
         const d = this.car.data(), dt = this.tripT ? Math.min(1000, now - this.tripT) : 0;
         this.tripT = now;
+        if (!d.demo) this._fuelModel(d, dt);
         if (d.demo || !isNum(d.speed) || d.speed < 2) return;
         this.tripKm += d.speed * dt / 3600000;
         this.tripMs += dt;
+    }
+
+    /** Fuel flow now from the engine's power (FUEL_*), l/100 km now (smoothed over ~2 s, null while standing), litres this drive. */
+    _fuelModel(d, dt) {
+        const rpm = d.rpm, tq = d.torque;
+        if (!isNum(rpm)) return;
+        const kw = isNum(tq) ? Math.max(0, tq) * rpm / 9549 : 0;
+        const lh = rpm < 300 ? 0 : FUEL_IDLE_LH + kw * FUEL_BSFC / FUEL_DENSITY;
+        this.fuelFlowLh = lh;
+        this.fuelModelL += lh * dt / 3600000;
+        const inst = isNum(d.speed) && d.speed >= 5 ? Math.min(30, lh / d.speed * 100) : null;
+        const k = 1 - Math.exp(-dt / 2000);
+        this.l100 = inst === null ? (lh === 0 && isNum(d.speed) && d.speed >= 5 ? 0 : null) : isNum(this.l100) ? this.l100 + (inst - this.l100) * k : inst;
     }
 
     /** km/h: the average moving speed this drive, from the first minute on (null before it, 54 on the demo). */
@@ -2918,8 +2977,9 @@ class HudApp {
             let anyRpm = false;
             for (let i = 0; i < PDASH_N; i++) {
                 const d = ds[i];
-                vals.push(d ? Math.round(this._pdashFrac(d) * 600) / 600 : 0, d ? this._pdashRed(d) : 2, d && isNum(d.glow) ? d.glow : 0.8, d && d.bezel === false ? 0 : 1);
-                if (d && d.signal === 'rpm' && !d.needle) anyRpm = true;
+                // a needle tach's red block ("redW") blinks at the shift point, as the shift lights would
+                vals.push(d ? Math.round(this._pdashFrac(d) * 600) / 600 : 0, d ? (d.redW && d.signal === 'rpm' && this.flash ? 2 : this._pdashRed(d)) : 2, d && isNum(d.glow) ? d.glow : 0.8, d && d.bezel === false ? 0 : 1);
+                if (d && d.signal === 'rpm' && (!d.needle || d.redW)) anyRpm = true;
             }
             const fl = anyRpm && this.flash ? 1 : 0;
             const hl = w.pill ? this._health().level : -1;
